@@ -20,6 +20,9 @@ The output file (haplotypeDM) will become the input of the haplotype-based fine-
 ### Haplotype-based fine-mapping
 python3 bin/HapFM_mapping.py -i haplotypeDM -c covariates -y phenotype -o output
 
+## Citation
+Wu X, Jiang W, Fragoso C, Huang J, Zhou G, Zhao H, et al. (2022) Prioritized candidate causal haplotype blocks in plant genome-wide association studies. PLoS Genet 18(10): e1010437. https://doi.org/10.1371/journal.pgen.1010437 
+
 
 
 
