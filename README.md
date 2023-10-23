@@ -15,6 +15,8 @@ R: gpart and optparse
 ### Haplotype block partition and cluster formation
 python3 bin/HapFM_haplotype.py -v VCF -b bigld -o output
 
+The output file (haplotypeDM) will become the input of the haplotype-based fine-mapping step.
+
 ### Haplotype-based fine-mapping
 python3 bin/HapFM_mapping.py -i haplotypeDM -c covariates -y phenotype -o output
 
