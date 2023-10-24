@@ -192,11 +192,11 @@ def sampling(y,C,HapDM,sig0_initiate,sig1_initiate,sige_initiate,pie_initiate,it
 
 		after = time.time()
 		if it > 100 and total_heritability > 1:
-			print("unrealistic beta sample",it,genetic_var,pheno_var,total_heritability)
+			#print("unrealistic beta sample",it,genetic_var,pheno_var,total_heritability)
 			continue
 
 		else:
-			print(it,str(after - before),sigma_1,sigma_e,large_beta_ratio,total_heritability)
+			#print(it,str(after - before),sigma_1,sigma_e,large_beta_ratio,total_heritability)
 
 			if it >= burn_in_iter:
 				trace[it-burn_in_iter,:] = [it,sigma_1,sigma_e,large_beta_ratio,pie,total_heritability]
@@ -244,7 +244,7 @@ def sampling(y,C,HapDM,sig0_initiate,sig1_initiate,sige_initiate,pie_initiate,it
 					break
 
 				else:
-					trace_ = np.empty((1000,7))
+					trace_ = np.empty((1000,6))
 					gamma_trace_ = np.empty((1000,H_c))
 					beta_trace_ = np.empty((1000,H_c))
 					alpha_trace_ = np.empty((1000,C_c))
