@@ -80,7 +80,7 @@ def sample_alpha(y,H_beta,C_alpha,C,alpha,sigma_e):
 		new_variance = 1/(np.linalg.norm(C[:,0])**2*sigma_e**-2)
 		new_mean = new_variance*np.dot((y-H_beta),C[:,0])*sigma_e**-2
 		alpha = np.random.normal(new_mean,math.sqrt(new_variance))
-		C_alpha = np.matmul(C,alpha)
+		C_alpha = C[:,0] * alpha
 	else:
 		for i in range(c):
 			new_variance = 1/(np.linalg.norm(C[:,i])**2*sigma_e**-2)
@@ -88,6 +88,7 @@ def sample_alpha(y,H_beta,C_alpha,C,alpha,sigma_e):
 			new_mean = new_variance*np.dot(y-C_alpha_negi-H_beta,C[:,i])*sigma_e**-2
 			alpha[i] = np.random.normal(new_mean,math.sqrt(new_variance))
 			C_alpha = C_alpha_negi + C[:,i] * alpha[i]
+
 	return(alpha,C_alpha)
 
 def sample_beta(y,C_alpha,H_beta,H,beta,gamma,sigma_0,sigma_1,sigma_e):
@@ -101,6 +102,7 @@ def sample_beta(y,C_alpha,H_beta,H,beta,gamma,sigma_0,sigma_1,sigma_e):
 		residual = y - C_alpha -  H_beta + H[:,i] * beta[i]
 		new_variance = 1/(np.sum(H[:,i]**2)*sigma_e_neg2+(1-gamma[i])*sigma_0_neg2+gamma[i]*sigma_1_neg2)
 		new_mean = new_variance*np.dot(residual,H[:,i])*sigma_e_neg2
+		#print(residual,new_variance,new_mean)
 		beta[i] = np.random.normal(new_mean,math.sqrt(new_variance))
 		H_beta = H_beta_negi + H[:,i] * beta[i]
 
@@ -118,19 +120,23 @@ def sample_beta(y,C_alpha,H_beta,H,beta,gamma,sigma_0,sigma_1,sigma_e):
 	# 	beta[indexs] = block_beta
 	return(beta,H_beta)
 
-def sampling(y,C,HapDM,sig0_initiate,sig1_initiate,sige_initiate,pie_initiate,iters,prefix):
+def sampling(y,C,HapDM,sig0_initiate,sig1_initiate,sige_initiate,pie_initiate,iters,prefix,num,trace_container,gamma_container,beta_container,alpha_container):
 
 
 	LOG = open(prefix+".log","w")
 
 	#initiate beta,gamma and H matrix
 	H = np.array(HapDM)
-	C_r, C_c = C.shape
+
 	H_r,H_c = H.shape
+
+
+	C_c = C.shape[1]
+
 
 	##specify hyper parameters
 	pie_a = 1
-	pie_b = H_c / 10
+	pie_b = H_c / 50
 	a_sigma = 1
 	b_sigma = 1
 	a_e = 1
@@ -150,7 +156,7 @@ def sampling(y,C,HapDM,sig0_initiate,sig1_initiate,sige_initiate,pie_initiate,it
 
 	it = 0
 	burn_in_iter = 2000
-	trace = np.empty((iters-2000,6))
+	trace = np.empty((iters-2000,5))
 	alpha_trace = np.empty((iters-2000,C_c))
 	gamma_trace = np.empty((iters-2000,H_c))
 	beta_trace = np.empty((iters-2000,H_c))
@@ -199,7 +205,7 @@ def sampling(y,C,HapDM,sig0_initiate,sig1_initiate,sige_initiate,pie_initiate,it
 			#print(it,str(after - before),sigma_1,sigma_e,large_beta_ratio,total_heritability)
 
 			if it >= burn_in_iter:
-				trace[it-burn_in_iter,:] = [it,sigma_1,sigma_e,large_beta_ratio,pie,total_heritability]
+				trace[it-burn_in_iter,:] = [sigma_1,sigma_e,large_beta_ratio,pie,total_heritability]
 				gamma_trace[it-burn_in_iter,:] = gamma
 				beta_trace[it-burn_in_iter,:] = beta
 				alpha_trace[it-burn_in_iter,:] = alpha
@@ -220,31 +226,31 @@ def sampling(y,C,HapDM,sig0_initiate,sig1_initiate,sige_initiate,pie_initiate,it
 					max_z.append(np.amax(np.absolute(beta_zscores)))
 
 				#convergence for large beta ratio
-				after_burnin_pie = trace[:,3]
+				after_burnin_pie = trace[:,2]
 				pie_zscores = geweke.geweke(after_burnin_pie)[:,1]
 				max_z.append(np.amax(np.absolute(pie_zscores)))
 
 				#convergence for total heritability
-				after_burnin_var = trace[:,5]
+				after_burnin_var = trace[:,4]
 				var_zscores = geweke.geweke(after_burnin_var)[:,1]
 				max_z.append(np.amax(np.absolute(var_zscores)))
 
-				#convergence for sigma_1
-				after_burnin_sigma1 = trace[:,1]
-				sigma1_zscores = geweke.geweke(after_burnin_sigma1)[:,1]
-				max_z.append(np.amax(np.absolute(sigma1_zscores)))
+				# #convergence for sigma_1
+				# after_burnin_sigma1 = trace[:,1]
+				# sigma1_zscores = geweke.geweke(after_burnin_sigma1)[:,1]
+				# max_z.append(np.amax(np.absolute(sigma1_zscores)))
 
 				#convergence for sigma_e
-				after_burnin_sigmae = trace[:,2]
+				after_burnin_sigmae = trace[:,1]
 				sigmae_zscores = geweke.geweke(after_burnin_sigmae)[:,1]
 				max_z.append(np.amax(np.absolute(sigmae_zscores)))
 				
-				if  np.amax(max_z) < 1.5:
+				if  np.amax(max_z) < 1.5 or it > 50000:
 					print("convergence has been reached at %i iterations." %(it),file=LOG)
 					break
 
 				else:
-					trace_ = np.empty((1000,6))
+					trace_ = np.empty((1000,5))
 					gamma_trace_ = np.empty((1000,H_c))
 					beta_trace_ = np.empty((1000,H_c))
 					alpha_trace_ = np.empty((1000,C_c))
@@ -265,16 +271,23 @@ def sampling(y,C,HapDM,sig0_initiate,sig1_initiate,sige_initiate,pie_initiate,it
 			it += 1
 	
 	LOG.close()
-	trace = pd.DataFrame(trace)
-	alpha_trace = pd.DataFrame(alpha_trace)
-	beta_trace = pd.DataFrame(beta_trace)
-	gamma_trace = pd.DataFrame(gamma_trace)
-	return(trace,alpha_trace,beta_trace,gamma_trace)
+
+
+	trace_container[num] = trace
+	alpha_container[num] = alpha_trace
+	beta_container[num] = beta_trace
+	gamma_container[num] = gamma_trace
+
+
+	# trace = pd.DataFrame(trace)
+	# alpha_trace = pd.DataFrame(alpha_trace)
+	# beta_trace = pd.DataFrame(beta_trace)
+	# gamma_trace = pd.DataFrame(gamma_trace)
+	# return(trace,alpha_trace,beta_trace,gamma_trace)
 
 def sampling_w_annotation(y,C,HapDM,annotation,sig0_initiate,sig1_initiate,sige_initiate,pie_initiate,step_size,iters,prefix):
 
 	#initiate beta,gamma and H matrix
-	C_r, C_c = C.shape
 	H_r,H_c = H.shape
 
 	##specify hyper parameters
