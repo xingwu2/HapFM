@@ -120,7 +120,7 @@ def sample_beta(y,C_alpha,H_beta,H,beta,gamma,sigma_0,sigma_1,sigma_e):
 	# 	beta[indexs] = block_beta
 	return(beta,H_beta)
 
-def sampling(verbose,y,C,HapDM,sig0_initiate,sig1_initiate,sige_initiate,pie_initiate,iters,prefix,num,trace_container,gamma_container,beta_container,alpha_container):
+def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,num,trace_container,gamma_container,beta_container,alpha_container):
 
 
 	LOG = open(prefix+".log","w")
@@ -143,10 +143,9 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,sig1_initiate,sige_initiate,pie_ini
 	b_e = 1
 
 	sigma_0 = sig0_initiate
-	sigma_1 = sig1_initiate
-	sigma_e = sige_initiate
-	pie = pie_initiate
-
+	sigma_1 = math.sqrt(1/np.random.gamma(a_sigma,b_sigma))
+	sigma_e = math.sqrt(1/np.random.gamma(a_e,b_e))
+	pie = np.random.beta(pie_a,pie_b)
 	
 	print("initiate:",sigma_1,sigma_e,pie,file = LOG)
 
