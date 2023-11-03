@@ -191,7 +191,8 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,sig1_initiate,sige_initiate,pie_ini
 		alpha,C_alpha = sample_alpha(y,H_beta,C_alpha,C,alpha,sigma_e)
 		beta,H_beta = sample_beta(y,C_alpha,H_beta,H,beta,gamma,sigma_0,sigma_1,sigma_e)
 		genetic_var = np.var(H_beta)
-		pheno_var = np.var(y - C_alpha)
+		#pheno_var = np.var(y - C_alpha)
+		pheno_var = np.var(y)
 		large_beta = np.absolute(beta) > 0.3
 		large_beta_ratio = np.sum(large_beta) / len(beta)
 		total_heritability = genetic_var / pheno_var
