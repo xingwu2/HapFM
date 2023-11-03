@@ -120,7 +120,7 @@ def sample_beta(y,C_alpha,H_beta,H,beta,gamma,sigma_0,sigma_1,sigma_e):
 	# 	beta[indexs] = block_beta
 	return(beta,H_beta)
 
-def sampling(y,C,HapDM,sig0_initiate,sig1_initiate,sige_initiate,pie_initiate,iters,prefix,num,trace_container,gamma_container,beta_container,alpha_container):
+def sampling(verbose,y,C,HapDM,sig0_initiate,sig1_initiate,sige_initiate,pie_initiate,iters,prefix,num,trace_container,gamma_container,beta_container,alpha_container):
 
 
 	LOG = open(prefix+".log","w")
@@ -202,7 +202,8 @@ def sampling(y,C,HapDM,sig0_initiate,sig1_initiate,sige_initiate,pie_initiate,it
 			continue
 
 		else:
-			#print(it,str(after - before),sigma_1,sigma_e,large_beta_ratio,total_heritability)
+			if verbose:
+				print(it,str(after - before),sigma_1,sigma_e,large_beta_ratio,total_heritability)
 
 			if it >= burn_in_iter:
 				trace[it-burn_in_iter,:] = [sigma_1,sigma_e,large_beta_ratio,pie,total_heritability]

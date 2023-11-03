@@ -22,7 +22,9 @@ parser.add_argument('-s0',type = float, action = 'store', dest = 's0',default = 
 parser.add_argument('-s1',type = float, action = 'store', dest = 's1',default = 1, help = "initiation for sigma1")
 parser.add_argument('-se',type = float, action = 'store', dest = 'se',default = 1, help = "initiation for sigmae")
 parser.add_argument('-p',type = float, action = 'store', dest = 'pie',default = 0.001, help = "initiation for pie")
+parser.add_argument('-v',action = 'store_true', dest = 'verbose',default = False, help = "print out each MCMC iteration")
 parser.add_argument('-o',type = str, action = 'store', dest = 'output',help = "the prefix of the output files")
+
 
 
 args = parser.parse_args()
@@ -58,7 +60,7 @@ if __name__ == '__main__':
 
 	if args.mode == 1:
 		for num in range(args.num):
-			p = mp.Process(target = gs.sampling, args=(y,C,HapDM,args.s0,args.s1,args.se,args.pie,12000,args.output,num,trace_container,gamma_container,beta_container,alpha_container))
+			p = mp.Process(target = gs.sampling, args=(args.verbose,y,C,HapDM,args.s0,args.s1,args.se,args.pie,12000,args.output,num,trace_container,gamma_container,beta_container,alpha_container))
 			processes.append(p)
 			p.start()
 	else:
