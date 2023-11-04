@@ -109,7 +109,7 @@ for ch in chromosome:
 	for i in range(len(haplotype_block_name[ch])):
 		print("%s" %(haplotype_block_name[ch][i]),file = OUTPUT_BLOCK_NAMES)
 
-OUTPUT_MARKER_NAMES = open(args.output+"_marker_names.txt","w")
+OUTPUT_MARKER_NAMES = open(args.output+"_haplotype_names.txt","w")
 for ch in chromosome:
 	for i in range(len(haplotype_marker_name[ch])):
 		print("%s" %(haplotype_marker_name[ch][i]),file = OUTPUT_MARKER_NAMES)

@@ -442,18 +442,9 @@ def haplotype_DM_generator(block_index,clutering_algorithm,haplotypes,n_clusters
 		for i in range(d_r):
 			haplotype_ = "".join(map(str,dedup_haplotypes[i,:]))
 			dictionary[haplotype_] = i
-		if breakpoints[block_index][0] == 0:
-			haplotype_names = [ch+"@"+str(0)+"-"+str(positions[breakpoints[block_index][1]+1])+'_'+str(l) for l in range(d_r)]
-			block_name = ch+"@"+str(0)+"-"+str(positions[breakpoints[block_index][1]+1])
-			marker_name = ch+"@"+str(positions[breakpoints[block_index][0]]) + "-" + str(positions[breakpoints[block_index][1]])
-		elif breakpoints[block_index][1] == len(positions):
-			haplotype_names = [ch+"@"+str(positions[breakpoints[block_index][0]-1])+"-"+str(positions[breakpoints[block_index][1]])+'_'+str(l) for l in range(d_r)]
-			block_name = ch+"@"+str(positions[breakpoints[block_index][0]-1])+"-"+str(positions[breakpoints[block_index][1]])
-			marker_name = ch+"@"+str(positions[breakpoints[block_index][0]])+"-"+str(positions[breakpoints[block_index][1]])
-		else:
-			haplotype_names = [ch+"@"+str(positions[breakpoints[block_index][0]-1])+"-"+str(positions[breakpoints[block_index][1]+1])+'_'+str(l) for l in range(d_r)]
-			block_name = ch+"@"+str(positions[breakpoints[block_index][0]-1])+"-"+str(positions[breakpoints[block_index][1]+1])
-			marker_name = ch+"@"+str(positions[breakpoints[block_index][0]])+"-"+str(positions[breakpoints[block_index][1]])
+		haplotype_names = [ch+"@"+str(positions[breakpoints[block_index][0]])+"-"+str(positions[breakpoints[block_index][1]])+'_'+str(l) for l in range(d_r)]
+		block_name = ch+"@"+str(positions[breakpoints[block_index][0]])+"-"+str(positions[breakpoints[block_index][1]])
+		marker_name = ch+"@"+str(positions[breakpoints[block_index][0]])+"-"+str(positions[breakpoints[block_index][1]])
 
 		DM_matrix_1 = np.zeros((int(r/2),d_r),dtype=int)
 		DM_matrix_2 = np.zeros((int(r/2),d_r),dtype=int)
@@ -488,20 +479,9 @@ def haplotype_DM_generator(block_index,clutering_algorithm,haplotypes,n_clusters
 			haplotype_ = "".join(map(str,dedup_haplotypes[j,:]))
 			dictionary[haplotype_] = clusters[j]
 		#the column names of the dataframe
-		if breakpoints[block_index][0] == 0:
-			haplotype_names = [ch+"@"+str(0)+"-"+str(positions[breakpoints[block_index][1]+1])+'_'+str(l) for l in range(max(clusters)+1)]
-			block_name = ch+"@"+str(0)+"-"+str(positions[breakpoints[block_index][1]+1])
-			marker_name = ch+"@"+str(positions[breakpoints[block_index][0]])+"-"+ str(positions[breakpoints[block_index][1]])
-		
-		elif breakpoints[block_index][1] == len(positions) - 1:
-			haplotype_names = [ch+"@"+str(positions[breakpoints[block_index][0]-1])+"-"+str(positions[breakpoints[block_index][1]])+'_'+str(i) for i in range(max(clusters)+1)]
-			block_name = ch+"@"+str(positions[breakpoints[block_index][0]-1])+"-"+str(positions[breakpoints[block_index][1]])
-			marker_name = ch+"@"+str(positions[breakpoints[block_index][0]])+"-"+str(positions[breakpoints[block_index][1]])
-		
-		else:
-			haplotype_names = [ch+"@"+str(positions[breakpoints[block_index][0]-1])+"-"+str(positions[breakpoints[block_index][1]+1])+'_'+str(i) for i in range(max(clusters)+1)]
-			block_name = ch+"@"+str(positions[breakpoints[block_index][0]-1])+"-"+str(positions[breakpoints[block_index][1]+1])
-			marker_name = ch+"@"+str(positions[breakpoints[block_index][0]])+"-"+str(positions[breakpoints[block_index][1]])
+		haplotype_names = [ch+"@"+str(positions[breakpoints[block_index][0]])+"-"+str(positions[breakpoints[block_index][1]])+'_'+str(i) for i in range(max(clusters)+1)]
+		block_name = ch+"@"+str(positions[breakpoints[block_index][0]])+"-"+str(positions[breakpoints[block_index][1]])
+		marker_name = ch+"@"+str(positions[breakpoints[block_index][0]])+"-"+str(positions[breakpoints[block_index][1]])
 
 		DM_matrix_1 = np.zeros((int(r/2),max(clusters)+1),dtype=int)
 		DM_matrix_2 = np.zeros((int(r/2),max(clusters)+1),dtype=int)
