@@ -203,10 +203,10 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,num,trace_container,ga
 
 		else:
 			if verbose:
-				print(it,str(after - before),sigma_1,sigma_e,large_beta_ratio,total_heritability)
+				print(it,str(after - before),sigma_1,sigma_e,large_beta_ratio,total_heritability,sum(gamma))
 
 			if it >= burn_in_iter:
-				trace[it-burn_in_iter,:] = [sigma_1,sigma_e,large_beta_ratio,pie,total_heritability]
+				trace[it-burn_in_iter,:] = [sigma_1,sigma_e,large_beta_ratio,sum(gamma),total_heritability]
 				gamma_trace[it-burn_in_iter,:] = gamma
 				beta_trace[it-burn_in_iter,:] = beta
 				alpha_trace[it-burn_in_iter,:] = alpha
