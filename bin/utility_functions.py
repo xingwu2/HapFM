@@ -104,7 +104,7 @@ def convert_independent_genomewide_breakpoints(common_breakpoints,common_index,r
 
 	j = 0
 	while j < len(gw_breakpoints):
-		if gw_breakpoints[j][1] - gw_breakpoints[j][0] < 500:
+		if gw_breakpoints[j][1] - gw_breakpoints[j][0] < 100:
 			if j == 0:
 				gw_breakpoints[j+1] = [gw_breakpoints[j][0],gw_breakpoints[j+1][1]]
 				del gw_breakpoints[j]
