@@ -34,14 +34,14 @@ def find_ld(i,snps,cutoff,window_size):  ###find the correlation of every SNP to
 	
 	left_list_ = np.where(left_cor_rev**2 > cutoff)[0]
 	for j in range(len(left_list_)-1):
-		if left_list_[j+1] - left_list_[j] > 20:
+		if left_list_[j+1] - left_list_[j] > 10:
 			left_list_ = left_list_[:j+1]
 			break
 	left_list_ = np.flip(left_list_) * -1
 
 	right_list_ = np.where(right_cor**2 > cutoff)[0]
 	for j in range(len(right_list_)-1):
-		if right_list_[j+1] - right_list_[j] > 20:
+		if right_list_[j+1] - right_list_[j] > 10:
 			right_list_ = right_list_[:j+1]
 			break
 		
