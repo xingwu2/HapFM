@@ -19,5 +19,5 @@ opt <- parse_args(opt_parser)
 
 geno <- read.delim(opt$geno, header=T)
 SNPinfo <- read.delim(opt$snp,sep = "\t", header=TRUE)
-res <- BigLD(geno = geno, SNPinfo = SNPinfo,CLQmode = "density",CLQcut = opt$cut,hrstType="fast")
+res <- BigLD(geno = geno, SNPinfo = SNPinfo,CLQmode = "density",CLQcut = opt$cut,hrstType="fast",MAFcut=0.05)
 write.table(res,file = paste(opt$out,"_res_btmp.txt",sep=""),quote = F,sep = "\t",row.names = F)

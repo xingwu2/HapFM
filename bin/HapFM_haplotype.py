@@ -59,7 +59,7 @@ with open(args.output+"_alone_SNPs.txt", "w") as L:
 
 		# calculating the allele frequency and find common alleles 
 		allele_frequency = np.sum(geno_matrix[ch],axis = 0) / (2*r)
-		common_allele_index[ch] = [i for i in range(len(allele_frequency)) if allele_frequency[i] > 0.05 and allele_frequency[i] < 0.95 ]
+		common_allele_index[ch] = [i for i in range(len(allele_frequency)) if allele_frequency[i] > 0.02 and allele_frequency[i] < 0.98 ]
 		common_geno_matrix[ch] = geno_matrix[ch][:,common_allele_index[ch]]
 		common_variant_names[ch] = [variant_names[ch][i] for i in common_allele_index[ch]]
 		common_variant_positions[ch] =[variant_positions[ch][i] for i in common_allele_index[ch]]
@@ -67,7 +67,7 @@ with open(args.output+"_alone_SNPs.txt", "w") as L:
 		#standardize the genotype matrix
 		common_geno_matrix_standard = preprocessing.scale(common_geno_matrix[ch])
 		#partition into complete independent LD blocks
-		print("start finding complete independent LD blocks using common SNPs with maf > 0.05")
+		print("start finding complete independent LD blocks using common SNPs with maf > 0.02")
 		IndepLD_common_breakpoints_index[ch],alone_common_SNPs_index[ch] = bp.CompleteLDPartition(standardized_genotype_matrix=common_geno_matrix_standard,cutoff=args.corr,window_size=args.window)
 		if len(alone_common_SNPs_index[ch]) > 0:
 			for i in alone_common_SNPs_index[ch]:
