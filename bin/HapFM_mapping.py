@@ -46,6 +46,17 @@ else:
 
 before = time.time()
 
+block_haplotypes = {}
+block_positions = []
+for i in range(len(hap_names)):
+	block_name_ = re.compile("(.*@.*)_[0-9]+")
+	m = block_name_.search(hap_names[i])
+	if m.group(1) in block_haplotypes:
+		block_haplotypes[m.group(1)].append(i)
+	else:
+		block_haplotypes[m.group(1)] = [i]
+		block_positions.append(m.group(1))
+
 if __name__ == '__main__':
 
 	trace_container = mp.Manager().dict()
@@ -57,7 +68,7 @@ if __name__ == '__main__':
 
 	if args.mode == 1:
 		for num in range(args.num):
-			p = mp.Process(target = gs.sampling, args=(args.verbose,y,C,HapDM,args.s0,12000,args.output,num,trace_container,gamma_container,beta_container,alpha_container))
+			p = mp.Process(target = gs.sampling, args=(args.verbose,y,C,HapDM,args.s0,12000,args.output,block_haplotypes,block_positions,num,trace_container,gamma_container,beta_container,alpha_container))
 			processes.append(p)
 			p.start()
 	else:
@@ -83,26 +94,34 @@ if __name__ == '__main__':
 	trace_posterior_sd = []
 
 	for num in range(args.num):
-		alpha_posterior.append(np.mean(alpha_container[num],axis=0))
-		alpha_posterior_sd.append(np.std(alpha_container[num],axis=0))
-		beta_posterior.append(np.mean(beta_container[num],axis=0))
-		beta_posterior_sd.append(np.std(beta_container[num],axis=0))
-		trace_posterior.append(np.mean(trace_container[num],axis=0))
-		trace_posterior_sd.append(np.std(trace_container[num],axis=0))
-		haplotype_pip.append(np.mean(gamma_container[num],axis = 0))
+		alpha_posterior.append(alpha_container[num]["avg"])
+		alpha_posterior_sd.append(alpha_container[num]["sd"])
+		beta_posterior.append(beta_container[num]["avg"])
+		beta_posterior_sd.append(beta_container[num]["sd"])
+		trace_posterior.append(trace_container[num]["avg"])
+		trace_posterior_sd.append(trace_container[num]["sd"])
+		haplotype_pip.append(gamma_container[num]["haplotype"])
+		block_pip.append(gamma_container[num]["block"])
+		# alpha_posterior.append(np.mean(alpha_container[num],axis=0))
+		# alpha_posterior_sd.append(np.std(alpha_container[num],axis=0))
+		# beta_posterior.append(np.mean(beta_container[num],axis=0))
+		# beta_posterior_sd.append(np.std(beta_container[num],axis=0))
+		# trace_posterior.append(np.mean(trace_container[num],axis=0))
+		# trace_posterior_sd.append(np.std(trace_container[num],axis=0))
+		# haplotype_pip.append(np.mean(gamma_container[num],axis = 0))
 
-		block_haplotypes = {}
-		block_positions = []
-		for i in range(len(hap_names)):
-			block_name_ = re.compile("(.*@.*)_[0-9]+")
-			m = block_name_.search(hap_names[i])
-			if m.group(1) in block_haplotypes:
-		 		block_haplotypes[m.group(1)].append(i)
-			else:
-				block_haplotypes[m.group(1)] = [i]
-				block_positions.append(m.group(1))
+		# block_haplotypes = {}
+		# block_positions = []
+		# for i in range(len(hap_names)):
+		# 	block_name_ = re.compile("(.*@.*)_[0-9]+")
+		# 	m = block_name_.search(hap_names[i])
+		# 	if m.group(1) in block_haplotypes:
+		#  		block_haplotypes[m.group(1)].append(i)
+		# 	else:
+		# 		block_haplotypes[m.group(1)] = [i]
+		# 		block_positions.append(m.group(1))
 
-		block_pip.extend([uf.pip_calculation_1(gamma_container[num],block_haplotypes,block_positions)])
+		# block_pip.extend([uf.pip_calculation_1(haplotype_pip,block_haplotypes,block_positions)])
 
 
 	alpha_posterior_median = np.median(alpha_posterior,axis=0)
@@ -111,6 +130,8 @@ if __name__ == '__main__':
 	beta_posterior_sd_median = np.median(beta_posterior_sd,axis=0)
 	trace_posterior_median = np.median(trace_posterior,axis=0)
 	trace_posterior_sd_median = np.median(trace_posterior_sd,axis=0)
+	print("trace_posterior_median",trace_posterior_median)
+	print("trace_posterior",trace_posterior)
 	haplotype_pip_median = np.median(haplotype_pip,axis=0)
 	block_pip_median = np.median(block_pip,axis=0)
 

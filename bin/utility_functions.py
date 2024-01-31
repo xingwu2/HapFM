@@ -533,18 +533,32 @@ def cat(dictionary,keys):
 
 
 
-def pip_calculation_1(haplotype_burnt_gamma,block_haplotypes,block_positions):
+# def pip_calculation_1(haplotype_burnt_gamma,block_haplotypes,block_positions):
 
-	nrow = haplotype_burnt_gamma.shape[0]
+# 	nrow = haplotype_burnt_gamma.shape[0]
+# 	ncol = len(block_haplotypes)
+# 	block_gamma = np.zeros(shape = (nrow,ncol))
+# 	for i in range(len(block_positions)):
+# 		col_index = block_haplotypes[block_positions[i]]
+# 		x = np.sum(haplotype_burnt_gamma[:,col_index],axis = 1)
+# 		row_index = np.where(x >= 1)
+# 		block_gamma[row_index[0],i] = 1
+# 	block_pip = np.mean(block_gamma,axis = 0)
+# 	return(block_pip)
+
+def block_pip_calculation(gamma_trace,block_haplotypes,block_positions):
+
+	nrow = gamma_trace.shape[0] ## number of MCMC iterations
 	ncol = len(block_haplotypes)
 	block_gamma = np.zeros(shape = (nrow,ncol))
 	for i in range(len(block_positions)):
 		col_index = block_haplotypes[block_positions[i]]
-		x = np.sum(haplotype_burnt_gamma[:,col_index],axis = 1)
+		x = np.sum(gamma_trace[:,col_index],axis = 1)
 		row_index = np.where(x >= 1)
 		block_gamma[row_index[0],i] = 1
 	block_pip = np.mean(block_gamma,axis = 0)
 	return(block_pip)
+
 
 
 def pip_calculation_2(haplotype_pip,block_haplotypes,block_positions):

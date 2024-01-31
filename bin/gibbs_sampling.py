@@ -5,6 +5,10 @@ import math
 import pandas as pd 
 import time
 import geweke
+import os
+
+import utility_functions as uf
+
 
 def sample_gamma_annotation(beta,gamma,sigma_0,sigma_1,A,theta):
 	inv_pie = np.matmul(A,theta)
@@ -120,7 +124,10 @@ def sample_beta(y,C_alpha,H_beta,H,beta,gamma,sigma_0,sigma_1,sigma_e):
 	# 	beta[indexs] = block_beta
 	return(beta,H_beta)
 
-def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,num,trace_container,gamma_container,beta_container,alpha_container):
+def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block_positions,num,trace_container,gamma_container,beta_container,alpha_container):
+
+	## set random seed for the process
+	np.random.seed(int(time.time()) + os.getpid())
 
 
 	LOG = open(prefix+".log","w")
@@ -147,8 +154,8 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,num,trace_container,ga
 	sigma_e = math.sqrt(1/np.random.gamma(a_e,b_e))
 	pie = np.random.beta(pie_a,pie_b)
 	
-	print("initiate:",sigma_1,sigma_e,pie,file = LOG)
-
+	#print("initiate:",sigma_1,sigma_e,pie,file = LOG)
+	print("initiate:",num,sigma_1,sigma_e,pie)
 
 	
 	#initiate alpha, alpha_trace, beta_trace and gamma_trace
@@ -273,18 +280,28 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,num,trace_container,ga
 	
 	LOG.close()
 
+	# trace values
+	trace_container[num] = {'avg': np.mean(trace,axis=0),
+							'sd' : np.std(trace,axis=0)}
+	print("trace_container[num]",num,trace_container[num]['avg'])
+	#alpha values
+	alpha_container[num] = {'avg': np.mean(alpha_trace,axis=0),
+							'sd': np.std(alpha_trace,axis=0)}
+	print("alpha_container[num]",num,alpha_container[num]['avg'])
+	#beta values
+	beta_container[num] = {'avg':np.mean(beta_trace,axis=0),
+							'sd':np.std(beta_trace,axis=0)}
+	print("beta_container[num]",num,beta_container[num]['avg'])
+	
 
-	trace_container[num] = trace
-	alpha_container[num] = alpha_trace
-	beta_container[num] = beta_trace
-	gamma_container[num] = gamma_trace
 
 
-	# trace = pd.DataFrame(trace)
-	# alpha_trace = pd.DataFrame(alpha_trace)
-	# beta_trace = pd.DataFrame(beta_trace)
-	# gamma_trace = pd.DataFrame(gamma_trace)
-	# return(trace,alpha_trace,beta_trace,gamma_trace)
+	block_pip = uf.block_pip_calculation(gamma_trace,block_haplotypes,block_positions)
+	#haplotype pip values
+	gamma_container[num] = {'haplotype':np.mean(gamma_trace,axis=0),
+							'block': block_pip}
+
+
 
 def sampling_w_annotation(y,C,HapDM,annotation,sig0_initiate,sig1_initiate,sige_initiate,pie_initiate,step_size,iters,prefix):
 
