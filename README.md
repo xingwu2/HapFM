@@ -4,9 +4,9 @@ HapFM has 2 main functions: genome-wide haplotype block partition and haplotype-
 
 ## Installation
 
-HapFM can be install both mannually and via conda/mamba package managers. 
+HapFM can be install both manually and via conda/mamba package managers. 
 
-### Install via conda/mamba (recommended because it is a one push button)
+### Install via conda/mamba (recommended because it is one push button)
 
 ```mamba env create -f environment.yml```  
 ```mamba activate hapfm```
