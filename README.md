@@ -15,7 +15,7 @@ HapFM can be install both mannually and via conda/mamba package managers.
 
 Please first ensure python3 and R are in your environment path. Then install these modules/libraries
 
-python3: modules including numpy,scipy,pandas,networkx,pyclustering and scikit-learn
+python3: numpy,scipy,pandas,networkx,pyclustering and scikit-learn
 
 R: gpart and optparse
 
