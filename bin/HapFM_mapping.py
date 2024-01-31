@@ -130,8 +130,6 @@ if __name__ == '__main__':
 	beta_posterior_sd_median = np.median(beta_posterior_sd,axis=0)
 	trace_posterior_median = np.median(trace_posterior,axis=0)
 	trace_posterior_sd_median = np.median(trace_posterior_sd,axis=0)
-	print("trace_posterior_median",trace_posterior_median)
-	print("trace_posterior",trace_posterior)
 	haplotype_pip_median = np.median(haplotype_pip,axis=0)
 	block_pip_median = np.median(block_pip,axis=0)
 

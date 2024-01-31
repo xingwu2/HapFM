@@ -154,8 +154,8 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 	sigma_e = math.sqrt(1/np.random.gamma(a_e,b_e))
 	pie = np.random.beta(pie_a,pie_b)
 	
-	#print("initiate:",sigma_1,sigma_e,pie,file = LOG)
-	print("initiate:",num,sigma_1,sigma_e,pie)
+	print("initiate:",sigma_1,sigma_e,pie,file = LOG)
+	#print("initiate:",num,sigma_1,sigma_e,pie)
 
 	
 	#initiate alpha, alpha_trace, beta_trace and gamma_trace
@@ -283,15 +283,15 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 	# trace values
 	trace_container[num] = {'avg': np.mean(trace,axis=0),
 							'sd' : np.std(trace,axis=0)}
-	print("trace_container[num]",num,trace_container[num]['avg'])
+	#print("trace_container[num]",num,trace_container[num]['avg'])
 	#alpha values
 	alpha_container[num] = {'avg': np.mean(alpha_trace,axis=0),
 							'sd': np.std(alpha_trace,axis=0)}
-	print("alpha_container[num]",num,alpha_container[num]['avg'])
+	#print("alpha_container[num]",num,alpha_container[num]['avg'])
 	#beta values
 	beta_container[num] = {'avg':np.mean(beta_trace,axis=0),
 							'sd':np.std(beta_trace,axis=0)}
-	print("beta_container[num]",num,beta_container[num]['avg'])
+	#print("beta_container[num]",num,beta_container[num]['avg'])
 	
 
 
