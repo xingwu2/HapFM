@@ -76,18 +76,20 @@ def sample_sigma_e(y,H_beta,C_alpha,a_e,b_e):
 	sigma_e_new = math.sqrt(1/sigma_e_neg2)
 	return(sigma_e_new)
 
-def sample_alpha(y,H_beta,C_alpha,C,alpha,sigma_e):
+def sample_alpha(y,H_beta,C_alpha,C,alpha,sigma_e,C_norm_2):
 
 	r,c = C.shape
 
 	if c == 1:
-		new_variance = 1/(np.linalg.norm(C[:,0])**2*sigma_e**-2)
+		#new_variance = 1/(np.linalg.norm(C[:,0])**2*sigma_e**-2)
+		new_variance = 1/(C_norm_2[0]*sigma_e**-2)
 		new_mean = new_variance*np.dot((y-H_beta),C[:,0])*sigma_e**-2
 		alpha = np.random.normal(new_mean,math.sqrt(new_variance))
 		C_alpha = C[:,0] * alpha
 	else:
 		for i in range(c):
-			new_variance = 1/(np.linalg.norm(C[:,i])**2*sigma_e**-2)
+			#new_variance = 1/(np.linalg.norm(C[:,i])**2*sigma_e**-2)
+			new_variance = 1/(C_norm_2[i]*sigma_e**-2)
 			C_alpha_negi = C_alpha - C[:,i] * alpha[i]
 			new_mean = new_variance*np.dot(y-C_alpha_negi-H_beta,C[:,i])*sigma_e**-2
 			alpha[i] = np.random.normal(new_mean,math.sqrt(new_variance))
@@ -95,7 +97,7 @@ def sample_alpha(y,H_beta,C_alpha,C,alpha,sigma_e):
 
 	return(alpha,C_alpha)
 
-def sample_beta(y,C_alpha,H_beta,H,beta,gamma,sigma_0,sigma_1,sigma_e):
+def sample_beta(y,C_alpha,H_beta,H,beta,gamma,sigma_0,sigma_1,sigma_e,H_norm_2):
 
 	sigma_e_neg2 = sigma_e**-2
 	sigma_0_neg2 = sigma_0**-2
@@ -104,9 +106,9 @@ def sample_beta(y,C_alpha,H_beta,H,beta,gamma,sigma_0,sigma_1,sigma_e):
 	for i in range(len(beta)):
 		H_beta_negi = H_beta - H[:,i] * beta[i]
 		residual = y - C_alpha -  H_beta + H[:,i] * beta[i]
-		new_variance = 1/(np.sum(H[:,i]**2)*sigma_e_neg2+(1-gamma[i])*sigma_0_neg2+gamma[i]*sigma_1_neg2)
+		#new_variance = 1/(np.sum(H[:,i]**2)*sigma_e_neg2+(1-gamma[i])*sigma_0_neg2+gamma[i]*sigma_1_neg2)
+		new_variance = 1/(H_norm_2[i]*sigma_e_neg2+(1-gamma[i])*sigma_0_neg2+gamma[i]*sigma_1_neg2)
 		new_mean = new_variance*np.dot(residual,H[:,i])*sigma_e_neg2
-		#print(residual,new_variance,new_mean)
 		beta[i] = np.random.normal(new_mean,math.sqrt(new_variance))
 		H_beta = H_beta_negi + H[:,i] * beta[i]
 
@@ -183,6 +185,13 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 	H_beta = np.matmul(H,beta)
 	C_alpha = np.matmul(C,alpha)
 
+
+	## precompute some variables 
+
+	C_norm_2 = np.sum(C**2,axis=0)
+	H_norm_2 = np.sum(H**2,axis=0)
+
+
 	while it < iters:
 		before = time.time()
 
@@ -194,8 +203,8 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 			pie = sample_pie(gamma,pie_a,pie_b)
 		sigma_e = sample_sigma_e(y,H_beta,C_alpha,a_e,b_e)
 		gamma = sample_gamma(beta,sigma_0,sigma_1,pie)
-		alpha,C_alpha = sample_alpha(y,H_beta,C_alpha,C,alpha,sigma_e)
-		beta,H_beta = sample_beta(y,C_alpha,H_beta,H,beta,gamma,sigma_0,sigma_1,sigma_e)
+		alpha,C_alpha = sample_alpha(y,H_beta,C_alpha,C,alpha,sigma_e,C_norm_2)
+		beta,H_beta = sample_beta(y,C_alpha,H_beta,H,beta,gamma,sigma_0,sigma_1,sigma_e,H_norm_2)
 		genetic_var = np.var(H_beta)
 		#pheno_var = np.var(y - C_alpha)
 		pheno_var = np.var(y)
