@@ -131,7 +131,7 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 	## set random seed for the process
 	np.random.seed(int(time.time()) + os.getpid())
 
-	os.system("mkdir log")
+	os.system("mkdir -p log")
 	LOG = open("log/"+prefix+"_"+str(os.getpid())+".log","w")
 
 	#initiate beta,gamma and H matrix
