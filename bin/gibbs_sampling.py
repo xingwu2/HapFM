@@ -6,7 +6,7 @@ import pandas as pd
 import time
 import geweke
 import os
-
+import gc
 import utility_functions as uf
 
 
@@ -132,7 +132,7 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 	np.random.seed(int(time.time()) + os.getpid())
 
 
-	LOG = open(prefix+".log","w")
+	LOG = open(prefix+"_"+os.getpid()+".log","w")
 
 	#initiate beta,gamma and H matrix
 	H = np.array(HapDM)
@@ -292,24 +292,30 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 	# trace values
 	trace_container[num] = {'avg': np.mean(trace,axis=0),
 							'sd' : np.std(trace,axis=0)}
+	del trace
+	gc.collect()
+
 	#print("trace_container[num]",num,trace_container[num]['avg'])
 	#alpha values
 	alpha_container[num] = {'avg': np.mean(alpha_trace,axis=0),
 							'sd': np.std(alpha_trace,axis=0)}
+	del alpha_trace
+	gc.collect()
 	#print("alpha_container[num]",num,alpha_container[num]['avg'])
 	#beta values
+
 	beta_container[num] = {'avg':np.mean(beta_trace,axis=0),
 							'sd':np.std(beta_trace,axis=0)}
+	del beta_trace
+	gc.collect()
 	#print("beta_container[num]",num,beta_container[num]['avg'])
 	
-
-
-
 	block_pip = uf.block_pip_calculation(gamma_trace,block_haplotypes,block_positions)
 	#haplotype pip values
 	gamma_container[num] = {'haplotype':np.mean(gamma_trace,axis=0),
 							'block': block_pip}
-
+	del gamma_trace
+	gc.collect()
 
 
 def sampling_w_annotation(y,C,HapDM,annotation,sig0_initiate,sig1_initiate,sige_initiate,pie_initiate,step_size,iters,prefix):
