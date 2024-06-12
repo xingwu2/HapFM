@@ -131,8 +131,8 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 	## set random seed for the process
 	np.random.seed(int(time.time()) + os.getpid())
 
-
-	LOG = open(prefix+"_"+os.getpid()+".log","w")
+	os.system("mkdir log")
+	LOG = open("log/"+prefix+"_"+str(os.getpid())+".log","w")
 
 	#initiate beta,gamma and H matrix
 	H = np.array(HapDM)
@@ -219,7 +219,7 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 
 		else:
 			if verbose:
-				print(it,str(after - before),sigma_1,sigma_e,large_beta_ratio,total_heritability,sum(gamma))
+				print(os.getpid(),it,str(after - before),sigma_1,sigma_e,large_beta_ratio,total_heritability,sum(gamma))
 
 			if it >= burn_in_iter:
 				trace[it-burn_in_iter,:] = [sigma_1,sigma_e,large_beta_ratio,sum(gamma),total_heritability]
