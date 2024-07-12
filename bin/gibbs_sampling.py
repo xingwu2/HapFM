@@ -309,7 +309,6 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 	del beta_trace
 	gc.collect()
 	#print("beta_container[num]",num,beta_container[num]['avg'])
-	
 	block_pip = uf.block_pip_calculation(gamma_trace,block_haplotypes,block_positions)
 	#haplotype pip values
 	gamma_container[num] = {'haplotype':np.mean(gamma_trace,axis=0),
