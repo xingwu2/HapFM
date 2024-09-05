@@ -18,7 +18,7 @@ def sample_gamma_annotation(beta,gamma,sigma_0,sigma_1,A,theta):
 	d1 = np.multiply(pie,sp.stats.norm.pdf(beta,loc=0,scale=sigma_1))
 	d0 = np.multiply((1-pie),sp.stats.norm.pdf(beta,loc=0,scale=sigma_0))
 	p = d1/(d0+d1)
-	gamma = np.random.binomial(1,p)
+	gamma = np.random.binomial(1,p).astype(np.int8)
 	return(gamma)
 
 def sample_theta(A,Z):
@@ -166,12 +166,12 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 	burn_in_iter = 2000
 	trace = np.empty((iters-2000,5))
 	alpha_trace = np.empty((iters-2000,C_c))
-	gamma_trace = np.empty((iters-2000,H_c))
+	gamma_trace = np.empty((iters-2000,H_c),dtype=np.int8)
 	beta_trace = np.empty((iters-2000,H_c))
 	top5_beta_trace = np.empty((iters-2000,5))
 
 	alpha = np.random.random(size = C_c)
-	gamma = np.random.binomial(1,pie,H_c)
+	gamma = np.random.binomial(1,pie,H_c).astype(np.int8)
 	beta = np.array(np.zeros(H_c))
 
 	for i in range(H_c):
@@ -268,7 +268,7 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 
 				else:
 					trace_ = np.empty((1000,5))
-					gamma_trace_ = np.empty((1000,H_c))
+					gamma_trace_ = np.empty((1000,H_c),dtype=np.int8)
 					beta_trace_ = np.empty((1000,H_c))
 					alpha_trace_ = np.empty((1000,C_c))
 					top5_beta_trace_ = np.empty((1000,5))
