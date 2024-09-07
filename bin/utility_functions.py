@@ -18,6 +18,15 @@ from sklearn import preprocessing
 from scipy.cluster.hierarchy import linkage
 from scipy.cluster.hierarchy import fcluster
 
+
+
+## TO WORK AROUND THE NUMPY WARNING BUG
+
+import warnings
+np.warnings = warnings
+
+
+
 '''
 define functions
 '''
@@ -216,7 +225,7 @@ def xmeans_clustering(array):
 	initial_centers = kmeans_plusplus_initializer(array, amount_initial_centers).initialize()
 	# Create instance of X-Means algorithm. The algorithm will start analysis from 2 clusters, the maximum
 	# number of clusters that can be allocated is 20.
-	xmeans_instance = xmeans(array, initial_centers, 10)
+	xmeans_instance = xmeans(array, initial_centers, 30)
 	xmeans_instance.process()
 	# Extract clustering results: clusters and their centers
 	clusters_ = xmeans_instance.get_clusters()
