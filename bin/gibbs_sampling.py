@@ -151,13 +151,16 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 	a_e = 1
 	b_e = 1
 
-	sigma_0 = sig0_initiate
+	H_var = np.sum(np.var(H,axis=0))
+	sigma_0 = np.sqrt(np.var(y) / H_var * sig0_initiate)
 	sigma_1 = math.sqrt(1/np.random.gamma(a_sigma,b_sigma))
 	sigma_e = math.sqrt(1/np.random.gamma(a_e,b_e))
 	pie = np.random.beta(pie_a,pie_b)
 	
-	print("initiate:",sigma_1,sigma_e,pie,file = LOG)
-	#print("initiate:",num,sigma_1,sigma_e,pie)
+	print("To set the background variation %f of the total phenotypic variation. We set the sigma 0 to be %f" %(sig0_initiate,sigma_0) )
+
+
+	print("initiation for chain %i:" %(num) ,sigma_1,sigma_e,pie)
 
 	
 	#initiate alpha, alpha_trace, beta_trace and gamma_trace
@@ -192,12 +195,14 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 	H_norm_2 = np.sum(H**2,axis=0)
 
 
+	bad_iter = 0
+
 	while it < iters:
 		before = time.time()
 
 		sigma_1 = sample_sigma_1(beta,gamma,a_sigma,b_sigma)
-		if sigma_1 < 0.05:
-			sigma_1 = 0.05
+		if sigma_1 < sigma_0 * 5:
+			sigma_1 = sigma_0 * 5
 			pie = 0
 		else:
 			pie = sample_pie(gamma,pie_a,pie_b)
@@ -206,20 +211,51 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 		alpha,C_alpha = sample_alpha(y,H_beta,C_alpha,C,alpha,sigma_e,C_norm_2)
 		beta,H_beta = sample_beta(y,C_alpha,H_beta,H,beta,gamma,sigma_0,sigma_1,sigma_e,H_norm_2)
 		genetic_var = np.var(H_beta)
-		#pheno_var = np.var(y - C_alpha)
-		pheno_var = np.var(y)
+		pheno_var = np.var(y - C_alpha)
 		large_beta = np.absolute(beta) > 0.3
 		large_beta_ratio = np.sum(large_beta) / len(beta)
 		total_heritability = genetic_var / pheno_var
 
 		after = time.time()
 		if it > 100 and total_heritability > 1:
-			#print("unrealistic beta sample",it,genetic_var,pheno_var,total_heritability)
+			bad_iter += 1
+
+			if bad_iter > 3000:
+				print("Chain %i has entered a bad state, restarting it." %(num),file=LOG)
+
+				## re-initiation of the hyper-parameters
+				sigma_0 = np.sqrt(np.var(y) / H_var * sig0_initiate)
+				sigma_1 = math.sqrt(1/np.random.gamma(a_sigma,b_sigma))
+				sigma_e = math.sqrt(1/np.random.gamma(a_e,b_e))
+				pie = np.random.beta(pie_a,pie_b)
+				it = 0
+				burn_in_iter = 2000
+				trace = np.empty((iters-2000,5))
+				alpha_trace = np.empty((iters-2000,C_c))
+				gamma_trace = np.zeros((iters-2000,H_c),dtype=np.int8)
+				beta_trace = np.empty((iters-2000,H_c))
+				top5_beta_trace = np.empty((iters-2000,5))
+
+				alpha = np.random.random(size = C_c)
+				gamma = np.random.binomial(1,pie,H_c).astype(np.int8)
+				beta = np.array(np.zeros(H_c))
+
+				for i in range(H_c):
+					if gamma[i] == 0:
+						beta[i] = np.random.normal(0,sigma_0)
+					else:
+						beta[i] = np.random.normal(0,sigma_1) 
+				H_beta = np.matmul(H,beta)
+				C_alpha = np.matmul(C,alpha)
+
+				## re-start the counting the bad iterations
+				bad_iter = 0
+
 			continue
 
 		else:
 			if verbose:
-				print(os.getpid(),it,str(after - before),sigma_1,sigma_e,large_beta_ratio,total_heritability,sum(gamma))
+				print(num,it,str(after - before),sigma_1,sigma_e,large_beta_ratio,total_heritability,sum(gamma))
 
 			if it >= burn_in_iter:
 				trace[it-burn_in_iter,:] = [sigma_1,sigma_e,large_beta_ratio,sum(gamma),total_heritability]
@@ -262,8 +298,8 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 				sigmae_zscores = geweke.geweke(after_burnin_sigmae)[:,1]
 				max_z.append(np.amax(np.absolute(sigmae_zscores)))
 				
-				if  np.amax(max_z) < 1.5 or it > 50000:
-					print("convergence has been reached at %i iterations." %(it),file=LOG)
+				if  np.amax(max_z) < 1.5:
+					print("Chain %i: convergence has been reached at %i iterations." %(num,it),file=LOG)
 					break
 
 				else:
@@ -283,7 +319,7 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 					iters += 1000
 
 			if (it - burn_in_iter) >= 0 and (it - burn_in_iter ) % 1000 == 0:
-				print("%i iterations have sampled" %(it), str(after - before),trace[it-burn_in_iter,:],file=LOG)
+				print("Chain %i has sampled %i iterations" %(num,it), str(after - before),trace[it-burn_in_iter,:],file=LOG)
 
 			it += 1
 	

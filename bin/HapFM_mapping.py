@@ -18,7 +18,7 @@ parser.add_argument('-y',type = str, action = 'store', dest = 'phenotype')
 parser.add_argument('-a',type = str, action = 'store', dest = 'annotation')
 parser.add_argument('-n',type = int, action = 'store', default = 5, dest = "num", help = 'number of MCMC chains run parallelly')
 parser.add_argument('-m',type = int, action = 'store', default = 1, dest = 'mode',help = "1:no annotation; 2:with annotation file")
-parser.add_argument('-s0',type = float, action = 'store', dest = 's0',default = 0.01, help = "initiation for sigma0")
+parser.add_argument('-s0',type = float, action = 'store', dest = 's0',default = 0.05, help = "the proportion of phenotypic variation explained by background variables")
 parser.add_argument('-v',action = 'store_true', dest = 'verbose',default = False, help = "print out each MCMC iteration")
 parser.add_argument('-o',type = str, action = 'store', dest = 'output',help = "the prefix of the output files")
 
