@@ -217,7 +217,7 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 		total_heritability = genetic_var / pheno_var
 
 		after = time.time()
-		if it > 100 and total_heritability > 1:
+		if it > 1000 and total_heritability > 1:
 			bad_iter += 1
 
 			if bad_iter > 3000:
