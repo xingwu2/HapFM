@@ -195,8 +195,6 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 	H_norm_2 = np.sum(H**2,axis=0)
 
 
-	bad_iter = 0
-
 	while it < iters:
 		before = time.time()
 
@@ -217,40 +215,7 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 		total_heritability = genetic_var / pheno_var
 
 		after = time.time()
-		if it > 1000 and total_heritability > 1:
-			bad_iter += 1
-
-			if bad_iter > 3000:
-				print("Chain %i has entered a bad state, restarting it." %(num),file=LOG)
-
-				## re-initiation of the hyper-parameters
-				sigma_0 = np.sqrt(np.var(y) / H_var * sig0_initiate)
-				sigma_1 = math.sqrt(1/np.random.gamma(a_sigma,b_sigma))
-				sigma_e = math.sqrt(1/np.random.gamma(a_e,b_e))
-				pie = np.random.beta(pie_a,pie_b)
-				it = 0
-				burn_in_iter = 2000
-				trace = np.empty((iters-2000,5))
-				alpha_trace = np.empty((iters-2000,C_c))
-				gamma_trace = np.zeros((iters-2000,H_c),dtype=np.int8)
-				beta_trace = np.empty((iters-2000,H_c))
-				top5_beta_trace = np.empty((iters-2000,5))
-
-				alpha = np.random.random(size = C_c)
-				gamma = np.random.binomial(1,pie,H_c).astype(np.int8)
-				beta = np.array(np.zeros(H_c))
-
-				for i in range(H_c):
-					if gamma[i] == 0:
-						beta[i] = np.random.normal(0,sigma_0)
-					else:
-						beta[i] = np.random.normal(0,sigma_1) 
-				H_beta = np.matmul(H,beta)
-				C_alpha = np.matmul(C,alpha)
-
-				## re-start the counting the bad iterations
-				bad_iter = 0
-
+		if it > 2000 and total_heritability > 1:
 			continue
 
 		else:
