@@ -8,6 +8,7 @@ import geweke
 import os
 import gc
 import utility_functions as uf
+from numba import njit
 
 
 def sample_gamma_annotation(beta,gamma,sigma_0,sigma_1,A,theta):
@@ -126,6 +127,38 @@ def sample_beta(y,C_alpha,H_beta,H,beta,gamma,sigma_0,sigma_1,sigma_e,H_norm_2):
 	# 	beta[indexs] = block_beta
 	return(beta,H_beta)
 
+@njit
+def sample_beta_numba(y, C_alpha, H_beta, H, beta, gamma, sigma_0, sigma_1, sigma_e, H_norm_2):
+	sigma_e_neg2 = sigma_e ** -2
+	sigma_0_neg2 = sigma_0 ** -2
+	sigma_1_neg2 = sigma_1 ** -2
+	ncols = beta.shape[0]
+	nrows = y.shape[0]
+    
+	for i in range(ncols):
+
+		for r in range(nrows):
+			H_beta[r] -= H[r, i] * beta[i]
+
+        # Compute the dot product over the column using the updated H_beta.
+		dot_val = 0.0
+		for r in range(nrows):
+            # residual = y[r] - C_alpha[r] - H_beta[r]
+			res_val = y[r] - C_alpha[r] - H_beta[r] 
+			dot_val += res_val * H[r, i]
+        
+		new_variance = 1.0 / (H_norm_2[i]*sigma_e_neg2 + (1 - gamma[i])*sigma_0_neg2 + gamma[i]*sigma_1_neg2)
+		new_mean = new_variance * sigma_e_neg2 * dot_val
+        
+        # Sample new beta using standard normal (Numba supports np.random.randn)
+		beta[i] = new_mean + math.sqrt(new_variance) * np.random.randn()
+       
+        # Update H_beta with the new contribution.
+		for r in range(nrows):
+			H_beta[r] += H[r, i] * beta[i]
+    
+	return (beta, H_beta)
+
 def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block_positions,num,trace_container,gamma_container,beta_container,alpha_container):
 
 	## set random seed for the process
@@ -207,7 +240,8 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 		sigma_e = sample_sigma_e(y,H_beta,C_alpha,a_e,b_e)
 		gamma = sample_gamma(beta,sigma_0,sigma_1,pie)
 		alpha,C_alpha = sample_alpha(y,H_beta,C_alpha,C,alpha,sigma_e,C_norm_2)
-		beta,H_beta = sample_beta(y,C_alpha,H_beta,H,beta,gamma,sigma_0,sigma_1,sigma_e,H_norm_2)
+		#beta,H_beta = sample_beta(y,C_alpha,H_beta,H,beta,gamma,sigma_0,sigma_1,sigma_e,H_norm_2)
+		beta,H_beta = sample_beta_numba(y,C_alpha,H_beta,H,beta,gamma,sigma_0,sigma_1,sigma_e,H_norm_2)
 		genetic_var = np.var(H_beta)
 		pheno_var = np.var(y - C_alpha)
 		large_beta = np.absolute(beta) > 0.3
