@@ -9,7 +9,7 @@ HapFM can be install both manually and via conda/mamba package managers.
 ### Install via conda/mamba (recommended because it is one push button)
 
 ```mamba env create -f environment.yml```  
-```mamba activate hapfm```
+```conda activate hapfm```
 
 ### Install mannually (if you have the patience and want to practice installing softwares)
 
