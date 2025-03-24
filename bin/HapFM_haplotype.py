@@ -20,7 +20,7 @@ parser.add_argument('-b',type = str, action= 'store',dest='block')
 parser.add_argument('-r',type = float, action = 'store', dest = 'corr',default=0.1)
 parser.add_argument('-c',type = float, action = 'store', dest = 'CLQcut',default=0.5)
 parser.add_argument('-w',type = int, action = 'store', dest = 'window',default = 100)
-parser.add_argument('-hc',type = str, action = 'store', dest = 'clustering',help = "haplotype clustering method",default = "modularity")
+parser.add_argument('-hc',type = str, action = 'store', dest = 'clustering',help = "haplotype clustering method",default = "xmeans")
 parser.add_argument('-o',type = str, action = 'store', dest = 'output',help = "the prefix of the output files")
 
 args = parser.parse_args()
