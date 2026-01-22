@@ -159,16 +159,13 @@ def sample_beta_numba(y, C_alpha, H_beta, H, beta, gamma, sigma_0, sigma_1, sigm
     
 	return (beta, H_beta)
 
-def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block_positions,num,trace_container,gamma_container,beta_container,alpha_container):
+def sampling(verbose,y,C,H,sig0_initiate,iters,prefix,block_haplotypes,block_positions,num,trace_container,gamma_container,beta_container,alpha_container,convergence_container):
 
 	## set random seed for the process
 	np.random.seed(int(time.time()) + os.getpid())
 
-	os.system("mkdir -p log")
-	LOG = open("log/"+prefix+"_"+str(os.getpid())+".log","w")
-
 	#initiate beta,gamma and H matrix
-	H = np.array(HapDM)
+	# H = np.array(HapDM)
 
 	H_r,H_c = H.shape
 
@@ -190,21 +187,26 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 	sigma_e = math.sqrt(1/np.random.gamma(a_e,b_e))
 	pie = np.random.beta(pie_a,pie_b)
 	
-	print("To set the background variation %f of the total phenotypic variation. We set the sigma 0 to be %f" %(sig0_initiate,sigma_0) )
+	if verbose > 0:
+		print("To set the background variation %f of the total phenotypic variation. We set the sigma 0 to be %f" %(sig0_initiate,sigma_0) )
+		print("initiation for chain %i:" %(num) ,sigma_1,sigma_e,pie)
 
-
-	print("initiation for chain %i:" %(num) ,sigma_1,sigma_e,pie)
+	#print("initiation for chain %i:" %(num) ,sigma_1,sigma_e,pie)
 
 	
 	#initiate alpha, alpha_trace, beta_trace and gamma_trace
 
 	it = 0
 	burn_in_iter = 2000
-	trace = np.empty((iters-2000,5))
-	alpha_trace = np.empty((iters-2000,C_c))
-	gamma_trace = np.empty((iters-2000,H_c),dtype=np.int8)
-	beta_trace = np.empty((iters-2000,H_c))
-	top5_beta_trace = np.empty((iters-2000,5))
+	step_size =2000
+	
+	convergence_start_iter = burn_in_iter
+	convergence_end_iter = np.array(range(convergence_start_iter*2,convergence_start_iter+step_size*4,step_size))
+	convergence_iter = convergence_start_iter+step_size*3
+
+	trace = np.empty((convergence_end_iter[-1]-burn_in_iter,7))
+	top5_beta_trace = np.empty((convergence_end_iter[-1]-burn_in_iter,5))
+
 
 	alpha = np.random.random(size = C_c)
 	gamma = np.random.binomial(1,pie,H_c).astype(np.int8)
@@ -228,7 +230,7 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 	H_norm_2 = np.sum(H**2,axis=0)
 
 
-	while it < iters:
+	while it < convergence_iter:
 		before = time.time()
 
 		sigma_1 = sample_sigma_1(beta,gamma,a_sigma,b_sigma)
@@ -248,108 +250,151 @@ def sampling(verbose,y,C,HapDM,sig0_initiate,iters,prefix,block_haplotypes,block
 		large_beta_ratio = np.sum(large_beta) / len(beta)
 		total_heritability = genetic_var / pheno_var
 
+		if C_c == 1:
+			alpha_norm = alpha
+		else:
+			alpha_norm = np.linalg.norm(alpha, ord=2)
+		beta_norm = np.linalg.norm(beta, ord=2)
+
 		after = time.time()
-		if it > 500 and total_heritability > 1:
+		if (it > 2000 and total_heritability > 1):
+			if verbose > 0:
+				print("unrealistic beta sample",it,genetic_var,pheno_var,total_heritability)
 			continue
 
 		else:
-			if verbose:
+			if verbose > 1:
 				print(num,it,str(after - before),sigma_1,sigma_e,large_beta_ratio,total_heritability,sum(gamma))
 
 			if it >= burn_in_iter:
-				trace[it-burn_in_iter,:] = [sigma_1,sigma_e,large_beta_ratio,sum(gamma),total_heritability]
-				gamma_trace[it-burn_in_iter,:] = gamma
-				beta_trace[it-burn_in_iter,:] = beta
-				alpha_trace[it-burn_in_iter,:] = alpha
+				trace[it-burn_in_iter,:] = [alpha_norm,beta_norm,sigma_1,sigma_e,large_beta_ratio,total_heritability,sum(gamma)]
 				top5_beta_trace[it-burn_in_iter,:] = np.sort(np.absolute(beta))[::-1][:5]
 
-			if it >= burn_in_iter + 9999: # after burn-in iterations, test convergence
-
-				max_z = []
+			if it == convergence_end_iter[-1] - 1:
 				
-				for a in range(C_c):
-					after_burnin_alpha = alpha_trace[:,a]
-					alpha_zscores = geweke.geweke(after_burnin_alpha)[:,1]
-					max_z.append(np.amax(np.absolute(alpha_zscores)))
+				num_convergence_test = len(convergence_end_iter)
 
-				for b in range(5):
-					after_burnin_beta = top5_beta_trace[:,b]
-					beta_zscores = geweke.geweke(after_burnin_beta)[:,1]
-					max_z.append(np.amax(np.absolute(beta_zscores)))
+				convergence_scores = np.zeros(len(convergence_end_iter))
 
-				#convergence for large beta ratio
-				after_burnin_pie = trace[:,2]
-				pie_zscores = geweke.geweke(after_burnin_pie)[:,1]
-				max_z.append(np.amax(np.absolute(pie_zscores)))
+				for s in range(num_convergence_test):
+					convergence_scores[s] = uf.convergence_geweke_test(trace,top5_beta_trace,convergence_start_iter-burn_in_iter,convergence_end_iter[s]-burn_in_iter)
 
-				#convergence for total heritability
-				after_burnin_var = trace[:,4]
-				var_zscores = geweke.geweke(after_burnin_var)[:,1]
-				max_z.append(np.amax(np.absolute(var_zscores)))
+				if np.sum(convergence_scores) == num_convergence_test:
+					convergence_container[num] = 1
 
-				# #convergence for sigma_1
-				# after_burnin_sigma1 = trace[:,1]
-				# sigma1_zscores = geweke.geweke(after_burnin_sigma1)[:,1]
-				# max_z.append(np.amax(np.absolute(sigma1_zscores)))
-
-				#convergence for sigma_e
-				after_burnin_sigmae = trace[:,1]
-				sigmae_zscores = geweke.geweke(after_burnin_sigmae)[:,1]
-				max_z.append(np.amax(np.absolute(sigmae_zscores)))
-				
-				if  np.amax(max_z) < 1.5:
-					print("Chain %i: convergence has been reached at %i iterations." %(num,it),file=LOG)
+					if verbose > 0:
+						print("convergence has been reached at %i iterations for chain %i. The MCMC Chain has entered a stationary stage" %(it,num))
+						print("trace values:", trace[it-burn_in_iter,:])
 					break
-
 				else:
-					trace_ = np.empty((1000,5))
-					gamma_trace_ = np.empty((1000,H_c),dtype=np.int8)
-					beta_trace_ = np.empty((1000,H_c))
-					alpha_trace_ = np.empty((1000,C_c))
+					trace_ = np.empty((1000,7))
 					top5_beta_trace_ = np.empty((1000,5))
 
-					trace = np.concatenate((trace[-(iters - burn_in_iter-1000):,:],trace_),axis=0)
-					gamma_trace = np.concatenate((gamma_trace[-(iters - burn_in_iter-1000):,:],gamma_trace_),axis=0)
-					beta_trace = np.concatenate((beta_trace[-(iters - burn_in_iter-1000):,:],beta_trace_),axis=0)
-					alpha_trace = np.concatenate((alpha_trace[-(iters - burn_in_iter-1000):,:],alpha_trace_),axis=0)
-					top5_beta_trace = np.concatenate((top5_beta_trace[-(iters - burn_in_iter-1000):,:],top5_beta_trace_),axis = 0)
+
+					trace = np.concatenate((trace[-(convergence_iter - burn_in_iter-1000):,:],trace_),axis=0)
+					top5_beta_trace = np.concatenate((top5_beta_trace[-(convergence_iter - burn_in_iter-1000):,:],top5_beta_trace_),axis = 0)
 
 					burn_in_iter += 1000
-					iters += 1000
+					convergence_iter += 1000
 
-			if (it - burn_in_iter) >= 0 and (it - burn_in_iter ) % 1000 == 0:
-				print("Chain %i has sampled %i iterations" %(num,it), str(after - before),trace[it-burn_in_iter,:],file=LOG)
+					convergence_start_iter += 1000
+					convergence_end_iter += 1000
+
+					#print(it,burn_in_iter,convergence_iter,convergence_start_iter,convergence_end_iter,trace.shape)
 
 			it += 1
+
+			if it > 100000: 
+				convergence_container[num] = 0
+				break
 	
-	LOG.close()
+	if convergence_container[num] == 1:
 
-	# trace values
-	trace_container[num] = {'avg': np.mean(trace,axis=0),
-							'sd' : np.std(trace,axis=0)}
-	del trace
-	gc.collect()
+		## MCMC draws for posterior mean
 
-	#print("trace_container[num]",num,trace_container[num]['avg'])
-	#alpha values
-	alpha_container[num] = {'avg': np.mean(alpha_trace,axis=0),
-							'sd': np.std(alpha_trace,axis=0)}
-	del alpha_trace
-	gc.collect()
-	#print("alpha_container[num]",num,alpha_container[num]['avg'])
-	#beta values
+		posterior_draws = 10000
 
-	beta_container[num] = {'avg':np.mean(beta_trace,axis=0),
-							'sd':np.std(beta_trace,axis=0)}
-	del beta_trace
-	gc.collect()
-	#print("beta_container[num]",num,beta_container[num]['avg'])
-	block_pip = uf.block_pip_calculation(gamma_trace,block_haplotypes,block_positions)
-	#haplotype pip values
-	gamma_container[num] = {'haplotype':np.mean(gamma_trace,axis=0),
-							'block': block_pip}
-	del gamma_trace
-	gc.collect()
+		alpha_mean = np.zeros(C_c)
+		beta_mean = np.zeros(H_c)
+		gamma_sum = np.zeros(H_c)
+
+		alpha_M2 = np.zeros(C_c)
+		beta_M2 = np.zeros(H_c)
+
+		posterior_trace = np.empty((posterior_draws,7))
+
+		alpha_trace = np.empty((posterior_draws,C_c))
+
+		it = 0
+
+		while it < posterior_draws:
+		
+			before = time.time()
+			sigma_1 = sample_sigma_1(beta,gamma,a_sigma,b_sigma)
+			if sigma_1 < sigma_0 * 5:
+				sigma_1 = sigma_0 * 5
+				pie = 0
+			else:
+				pie = sample_pie(gamma,pie_a,pie_b)
+			sigma_e = sample_sigma_e(y,H_beta,C_alpha,a_e,b_e)
+			gamma = sample_gamma(beta,sigma_0,sigma_1,pie)
+			alpha,C_alpha = sample_alpha(y,H_beta,C_alpha,C,alpha,sigma_e,C_norm_2)
+			beta,H_beta = sample_beta_numba(y,C_alpha,H_beta,H,beta,gamma,sigma_0,sigma_1,sigma_e,H_norm_2)
+			genetic_var = np.var(H_beta)
+			pheno_var = np.var(y - C_alpha)
+			large_beta = np.absolute(beta) > 0.3
+			large_beta_ratio = np.sum(large_beta) / len(beta)
+			total_heritability = genetic_var / pheno_var
+			if C_c == 1:
+				alpha_norm = alpha
+			else:
+				alpha_norm = np.linalg.norm(alpha, ord=2)
+			beta_norm = np.linalg.norm(beta, ord=2)
+			after = time.time()
+			if total_heritability > 1:
+				if verbose > 0:
+					print("unrealistic beta sample",it,genetic_var,pheno_var,total_heritability)
+				continue
+
+			else:
+				if verbose >1 :
+					print(it,str(after - before),pie,sigma_1,sigma_e,sum(gamma),large_beta_ratio,max(abs(beta)),total_heritability)
+
+				posterior_trace[it,:] = [alpha_norm,beta_norm,sigma_1,sigma_e,large_beta_ratio,total_heritability,sum(gamma)]
+				alpha_trace[it,:] = alpha
+				beta_mean,beta_M2 = uf.welford(beta_mean,beta_M2,beta,it)
+				alpha_mean,alpha_M2 = uf.welford(alpha_mean,alpha_M2,alpha,it)
+				gamma_sum += gamma
+
+				if verbose > 0:
+					if it > 0 and it % 2000 == 0:
+						print("Posterior draws: %i iterations have been sampled for chain %i" %(it,num), str(after - before),posterior_trace[it,:])
+				it += 1
+
+		trace_container[num] = posterior_trace
+
+		#alpha values
+		alpha_container[num] = {'avg': alpha_mean,
+								'M2': alpha_M2}
+
+		#beta values
+		beta_container[num] = {'avg':beta_mean,
+								'M2':beta_M2}
+
+		gamma_container[num] = gamma_sum / posterior_draws
+
+	else:
+		trace_container[num] = []
+
+		#alpha values
+		alpha_container[num] = {'avg': [],
+								'M2': []}
+
+		#beta values
+		beta_container[num] = {'avg':[],
+								'M2':[]}
+
+		gamma_container[num] = []
 
 
 def sampling_w_annotation(y,C,HapDM,annotation,sig0_initiate,sig1_initiate,sige_initiate,pie_initiate,step_size,iters,prefix):

@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import scipy
 import networkx as nx
+import argparse
 
 from pyclustering.cluster.xmeans import xmeans
 from pyclustering.cluster.center_initializer import kmeans_plusplus_initializer
@@ -18,6 +19,7 @@ from sklearn import preprocessing
 from scipy.cluster.hierarchy import linkage
 from scipy.cluster.hierarchy import fcluster
 
+import geweke
 
 
 ## TO WORK AROUND THE NUMPY WARNING BUG
@@ -259,6 +261,7 @@ def DBSCAN_clustering(np_array):
 
 def local_scale_Spectral(np_array):
 	r,c =np_array.shape
+	print(r,c)
 	k = max(int(r/10),10)
 
 	dists = squareform(pdist((np_array)))
@@ -605,6 +608,66 @@ def block_beta(beta_mean,block_haplotypes,block_positions):
 
 	return(block_beta)
 
+def merge_welford(A_mean, A_M2,A_n,B_mean,B_M2,B_n):
 
+    if A_n == 0:
+        return(B_mean,B_M2,B_n)
+
+    if B_n == 0:
+        return(A_mean,A_M2,A_n)
+    
+    n_new = A_n + B_n
+    delta = B_mean - A_mean
+
+    mean = A_mean + delta * (B_n / n_new)
+    M2 = A_M2 + B_M2 + (delta * delta) * (A_n * B_n / n_new)
+
+    return(mean,M2,n_new)
+
+def welford(mean,M2,x,n):
+    n = n + 1
+
+    delta = x - mean
+    mean += delta / n
+    delta2 = x - mean
+    M2 += delta * delta2
+
+    return(mean,M2)
+
+def convergence_geweke_test(trace,top5_beta_trace,start,end):
+    max_z = []
+
+    ## convergence for the trace values
+    n = trace.shape[1]
+    for t in range(n):
+        trace_convergence = trace[start:end,t]
+        trace_t_convergence_zscores = geweke.geweke(trace_convergence)[:,1]
+        max_z.append(np.amax(np.absolute(trace_t_convergence_zscores)))
+
+    m = top5_beta_trace.shape[1]
+    for b in range(m):
+        top_beta_convergence = top5_beta_trace[start:end,b]
+        beta_b_convergence_zscores = geweke.geweke(top_beta_convergence)[:,1]
+        max_z.append(np.amax(np.absolute(beta_b_convergence_zscores)))
+
+    if np.amax(max_z) < 1.5:
+        return(1)
+
+def parse_arguments_mapping():
+
+	parser = argparse.ArgumentParser()
+	parser.add_argument('-i',type = str, action = 'store', dest = 'input')
+	parser.add_argument('-c',type = str, action = 'store', dest = 'covariates')
+	parser.add_argument('-y',type = str, action = 'store', dest = 'phenotype')
+	parser.add_argument('-a',type = str, action = 'store', dest = 'annotation')
+	parser.add_argument('-n',type = int, action = 'store', default = 5, dest = "num", help = 'number of MCMC chains run parallelly')
+	parser.add_argument('-m',type = int, action = 'store', default = 1, dest = 'mode',help = "1:no annotation; 2:with annotation file")
+	parser.add_argument('-s0',type = float, action = 'store', dest = 's0',default = 0.05, help = "the proportion of phenotypic variation explained by background variables")
+	parser.add_argument('-v',type = int, action = 'store', default = 0, dest = 'verbose', help = "verbose levels 0: no stdout; 1: convergence and minimal stdout; 2: per MCMC iteration stdout")
+	parser.add_argument('-o',type = str, action = 'store', dest = 'output',help = "the prefix of the output files")
+
+	args = parser.parse_args()
+
+	return(args)
 
 

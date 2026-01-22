@@ -10,65 +10,53 @@ import time
 import utility_functions as uf
 import gibbs_sampling as gs
 
+def main():
+	args = uf.parse_arguments_mapping()
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-i',type = str, action = 'store', dest = 'input')
-parser.add_argument('-c',type = str, action = 'store', dest = 'covariates')
-parser.add_argument('-y',type = str, action = 'store', dest = 'phenotype')
-parser.add_argument('-a',type = str, action = 'store', dest = 'annotation')
-parser.add_argument('-n',type = int, action = 'store', default = 5, dest = "num", help = 'number of MCMC chains run parallelly')
-parser.add_argument('-m',type = int, action = 'store', default = 1, dest = 'mode',help = "1:no annotation; 2:with annotation file")
-parser.add_argument('-s0',type = float, action = 'store', dest = 's0',default = 0.05, help = "the proportion of phenotypic variation explained by background variables")
-parser.add_argument('-v',action = 'store_true', dest = 'verbose',default = False, help = "print out each MCMC iteration")
-parser.add_argument('-o',type = str, action = 'store', dest = 'output',help = "the prefix of the output files")
+	HapDM = pd.read_csv(args.input,sep="\t")
+	n,p = HapDM.shape
+	hap_names = HapDM.columns.values.tolist()
+	HapDM = np.array(HapDM)
 
+	y = []
+	with open(args.phenotype,"r") as f:
+		for line in f:
+			line = line.strip("\n")
+			y.append(float(line))
 
+	y = np.asarray(y)
 
-args = parser.parse_args()
-
-HapDM = pd.read_csv(args.input,sep="\t")
-n,p = HapDM.shape
-hap_names = HapDM.columns.values.tolist()
-
-y = []
-with open(args.phenotype,"r") as f:
-	for line in f:
-		line = line.strip("\n")
-		y.append(float(line))
-
-y = np.asarray(y)
-
-if args.covariates is None:
-	C = np.ones(n)
-	C = C.reshape(n, 1)
-else:
-	C =  np.array(pd.read_csv(args.covariates,sep="\t",header=None)) 
-
-before = time.time()
-
-block_haplotypes = {}
-block_positions = []
-for i in range(len(hap_names)):
-	block_name_ = re.compile("(.*@.*)_[0-9]+")
-	m = block_name_.search(hap_names[i])
-	if m.group(1) in block_haplotypes:
-		block_haplotypes[m.group(1)].append(i)
+	if args.covariates is None:
+		C = np.ones(n)
+		C = C.reshape(n, 1)
 	else:
-		block_haplotypes[m.group(1)] = [i]
-		block_positions.append(m.group(1))
+		C =  np.array(pd.read_csv(args.covariates,sep="\t",header=None)) 
 
-if __name__ == '__main__':
+	before = time.time()
+
+	block_haplotypes = {}
+	block_positions = []
+
+	for i in range(len(hap_names)):
+		block_name_ = re.compile("(.*@.*)_[0-9]+")
+		m = block_name_.search(hap_names[i])
+		if m.group(1) in block_haplotypes:
+			block_haplotypes[m.group(1)].append(i)
+		else:
+			block_haplotypes[m.group(1)] = [i]
+			block_positions.append(m.group(1))
 
 	trace_container = mp.Manager().dict()
 	gamma_container = mp.Manager().dict()
 	beta_container = mp.Manager().dict()
 	alpha_container = mp.Manager().dict()
+	convergence_container = mp.Manager().dict()
 
 	processes = []
 
 	if args.mode == 1:
 		for num in range(args.num):
-			p = mp.Process(target = gs.sampling, args=(args.verbose,y,C,HapDM,args.s0,12000,args.output,block_haplotypes,block_positions,num,trace_container,gamma_container,beta_container,alpha_container))
+			p = mp.Process(target = gs.sampling, args=(args.verbose,y,C,HapDM,args.s0,12000,args.output,block_haplotypes,block_positions,num,trace_container,gamma_container,beta_container,alpha_container,convergence_container))
 			processes.append(p)
 			p.start()
 	else:
@@ -80,165 +68,81 @@ if __name__ == '__main__':
 	for process in processes:
 		process.join()
 
-	after=time.time()
 
-	print(str(after-before))
+	convergence_all_chains = []
+	alpha_posterior_all_chains = []
+	alpha_posterior_sd_all_chains = []
+	beta_posterior_all_chains = []
+	beta_posterior_sd_all_chains = []
+	gamma_all_chains = []
+	trace_posterior_all_chains = []
 
-	alpha_posterior = []
-	alpha_posterior_sd = []
-	beta_posterior = []
-	beta_posterior_sd = []
-	haplotype_pip = []
-	block_pip = []
-	trace_posterior = []
-	trace_posterior_sd = []
+	column_names = "alpha_norm_2\tbeta_norm_2\tsigma_1\tsigma_e\tlarge_beta_ratio\ttotal_heritability\tsum_gamma"
 
 	for num in range(args.num):
-		alpha_posterior.append(alpha_container[num]["avg"])
-		alpha_posterior_sd.append(alpha_container[num]["sd"])
-		beta_posterior.append(beta_container[num]["avg"])
-		beta_posterior_sd.append(beta_container[num]["sd"])
-		trace_posterior.append(trace_container[num]["avg"])
-		trace_posterior_sd.append(trace_container[num]["sd"])
-		haplotype_pip.append(gamma_container[num]["haplotype"])
-		block_pip.append(gamma_container[num]["block"])
-		# alpha_posterior.append(np.mean(alpha_container[num],axis=0))
-		# alpha_posterior_sd.append(np.std(alpha_container[num],axis=0))
-		# beta_posterior.append(np.mean(beta_container[num],axis=0))
-		# beta_posterior_sd.append(np.std(beta_container[num],axis=0))
-		# trace_posterior.append(np.mean(trace_container[num],axis=0))
-		# trace_posterior_sd.append(np.std(trace_container[num],axis=0))
-		# haplotype_pip.append(np.mean(gamma_container[num],axis = 0))
+		convergence_all_chains.append(convergence_container[num])
 
-		# block_haplotypes = {}
-		# block_positions = []
-		# for i in range(len(hap_names)):
-		# 	block_name_ = re.compile("(.*@.*)_[0-9]+")
-		# 	m = block_name_.search(hap_names[i])
-		# 	if m.group(1) in block_haplotypes:
-		#  		block_haplotypes[m.group(1)].append(i)
-		# 	else:
-		# 		block_haplotypes[m.group(1)] = [i]
-		# 		block_positions.append(m.group(1))
+	print("%i/%i chains have reached the convergence." %(np.sum(convergence_all_chains),len(convergence_all_chains)))
 
-		# block_pip.extend([uf.pip_calculation_1(haplotype_pip,block_haplotypes,block_positions)])
-
-
-	alpha_posterior_median = np.median(alpha_posterior,axis=0)
-	alpha_posterior_sd_median = np.median(alpha_posterior_sd,axis=0)
-	beta_posterior_median = np.median(beta_posterior,axis=0)
-	beta_posterior_sd_median = np.median(beta_posterior_sd,axis=0)
-	trace_posterior_median = np.median(trace_posterior,axis=0)
-	trace_posterior_sd_median = np.median(trace_posterior_sd,axis=0)
-	haplotype_pip_median = np.median(haplotype_pip,axis=0)
-	block_pip_median = np.median(block_pip,axis=0)
-
-	OUTPUT_BLOCK = open(args.output+"_block_pip.txt","w")
-	for i in range(len(block_pip_median)):
-		print("%s\t%s" %(block_positions[i],block_pip_median[i]),file = OUTPUT_BLOCK)
-
-	OUTPUT_HAP = open(args.output+"_haplotype_pip.txt","w")
-	for i in range(len(haplotype_pip_median)):
-		print("%s\t%s" %(hap_names[i],haplotype_pip_median[i]),file = OUTPUT_HAP)
-
-	OUTPUT_ALPHA = open(args.output+"_alpha.txt","w")
-	for i in range(len(alpha_posterior_median)):
-		print("%f\t%f" %(alpha_posterior_median[i],alpha_posterior_sd_median[i]),file = OUTPUT_ALPHA)
-
-	OUTPUT_BETA = open(args.output+"_beta.txt","w")
-	for i in range(len(beta_posterior_median)):
-		print("%s\t%f\t%f" %(hap_names[i],beta_posterior_median[i],beta_posterior_sd_median[i]),file = OUTPUT_BETA)
-
-	OUTPUT_TRACE = open(args.output+"_trace.txt","w")
-	for i in range(len(trace_posterior_median)):
-		print("%f\t%f" %(trace_posterior_median[i],trace_posterior_sd_median[i]),file = OUTPUT_TRACE)
-
-
-
-
-
-
-# if args.mode == 1:
-# 	trace,alpha_trace,beta_trace,gamma_trace = gs.sampling(y,C,HapDM,args.s0,args.s1,args.se,args.pie,iters=12000,prefix=args.output)
-# 	gamma_trace.columns = hap_names
-# 	beta_trace.columns = hap_names
-# 	trace.to_csv(args.output+"_trace.txt",sep="\t",header=False,index=False)
-
-# 	alpha_trace_avg = np.mean(alpha_trace,axis=0)
-# 	alpha_trace_sd = np.std(alpha_trace,axis = 0)
-# 	OUTPUT_ALPHA = open(args.output+"_alpha.txt","w")
-# 	for i in range(C.shape[1]):
-# 		print("%f\t%f" %(alpha_trace_avg[i],alpha_trace_sd[i]),file = OUTPUT_ALPHA)
-
-# 	beta_trace_avg = np.mean(beta_trace,axis=0)
-# 	beta_trace_sd = np.std(beta_trace,axis = 0)
-# 	OUTPUT_BETA = open(args.output+"_beta.txt","w")
-# 	for i in range(len(hap_names)):
-# 		print("%s\t%f\t%f" %(hap_names[i],beta_trace_avg[i],beta_trace_sd[i]),file = OUTPUT_BETA)
-
-
-# elif args.mode == 2:
-# 	if args.annotation == None:
-# 		sys.out("ERROR: please provide the annotation file")
-# 	else:
-# 		Annotation = np.array(pd.read_csv(args.annotation,sep="\t"))
-# 		trace,alpha_trace,beta_trace,gamma_trace,theta_trace = gs.sampling_w_annotation(y,C,HapDM,Annotation,args.s0,args.s1,args.se,args.pie,step_size=args.step,iters=10000,prefix=args.output)
-# 		gamma_trace.columns = hap_names
-# 		beta_trace.columns = hap_names
-# 		trace.to_csv(args.output+"_trace.txt",sep="\t",header=False,index=False)
+	if np.sum(convergence_all_chains) > 0:
+		for num in range(args.num):
+			if convergence_all_chains[num] == 1:
+				alpha_posterior_all_chains.append(alpha_container[num]["avg"])
+				alpha_posterior_sd_all_chains.append(alpha_container[num]["M2"])
+				beta_posterior_all_chains.append(beta_container[num]["avg"])
+				beta_posterior_sd_all_chains.append(beta_container[num]["M2"])
+				trace_posterior_all_chains.append(trace_container[num])
+				gamma_all_chains.append(gamma_container[num])
 		
-# 		alpha_trace_avg = np.mean(alpha_trace,axis=0)
-# 		alpha_trace_sd = np.std(alpha_trace,axis = 0)
-# 		OUTPUT_ALPHA = open(args.output+"_alpha.txt","w")
-# 		for i in range(C.shape[1]):
-# 			print("%f\t%f" %(alpha_trace_avg[i],alpha_trace_sd[i]),file = OUTPUT_ALPHA)
+		trace_posterior_all_chains = np.vstack(trace_posterior_all_chains)
+		trace_posterior = np.mean(trace_posterior_all_chains,axis=0)
+		trace_posterior_sd = np.std(trace_posterior_all_chains,axis=0)
 
-# 		theta_trace_avg = np.mean(theta_trace,axis=0)
-# 		theta_trace_sd = np.std(theta_trace,axis = 0)
-# 		OUTPUT_THETA = open(args.output+"_alpha.txt","w")
-# 		for i in range(Annotation.shape[1]):
-# 			print("%f\t%f" %(theta_trace_avg[i],theta_trace_sd[i]),file = OUTPUT_THETA)
+		pip = np.mean(gamma_all_chains,axis=0)
 
-# 		beta_trace_avg = np.mean(beta_trace,axis=0)
-# 		beta_trace_sd = np.std(beta_trace,axis = 0)
-# 		OUTPUT_BETA = open(args.output+"_beta.txt","w")
-# 		for i in range(len(hap_names)):
-# 			print("%s\t%f\t%f" %(hap_names[i],beta_trace_avg[i],beta_trace_sd[i]),file = OUTPUT_BETA)
+		beta_posterior = []
+		beta_posterior_M2 = []
+		alpha_posterior = []
+		alpha_posterior_M2 = []
+				
+		N_beta=0
+		N_alpha=0
 
-# else:
-# 	sys.out("ERROR: Unknown sampling mode")
+		for num in range(args.num):
+			if convergence_all_chains[num] == 1:
+				beta_posterior,beta_posterior_M2,N_beta = uf.merge_welford(beta_posterior,beta_posterior_M2,N_beta,beta_container[num]["avg"],beta_container[num]["M2"],10000)
+				alpha_posterior,alpha_posterior_M2,N_alpha = uf.merge_welford(alpha_posterior,alpha_posterior_M2,N_alpha,alpha_container[num]["avg"],alpha_container[num]["M2"],10000)
 
-# ################# PIP calculation
+		beta_posterior_sd = np.sqrt(beta_posterior_M2/(N_beta-1))
+		alpha_posterior_sd = np.sqrt(alpha_posterior_M2/(N_alpha-1))
+		np.savetxt(args.output+"_model_trace.txt",trace_posterior_all_chains,delimiter="\t",header=column_names)
 
+		OUTPUT_TRACE = open(args.output+"_param.txt","w")
+		for i in range(len(trace_posterior)):
+			print("%s\t%f\t%f" %(column_names[i],trace_posterior[i],trace_posterior_sd[i]),file = OUTPUT_TRACE)
+				
+		OUTPUT_ALPHA = open(args.output+"_alpha.txt","w")
+		for i in range(len(alpha_posterior)):
+			print("%f\t%f" %(alpha_posterior[i],alpha_posterior_sd[i]),file = OUTPUT_ALPHA)
 
+		OUTPUT_BETA = open(args.output+"_beta.txt","w")
+		print("haplotype_block\tbeta_mean\tbeta_sd\tpip",file = OUTPUT_BETA)
+		for i in range(len(beta_posterior)):
+			print("%s\t%f\t%f\t%f" %(hap_names[i],beta_posterior[i],beta_posterior_sd[i],pip[i]),file = OUTPUT_BETA)
 
-# haplotype_burnt_gamma = np.array(gamma_trace)
+	else:
+		OUTPUT_TRACE = open(args.output+"_param.txt","w")
+		for i in range(len(column_names)):
+			print("%s\t%s\t%s" %(column_names[i],"NA","NA"),file = OUTPUT_TRACE)
+				
+		OUTPUT_ALPHA = open(args.output+"_alpha.txt","w")
+		for i in range(C.shape[1]):
+			print("%s\t%s" %("NA","NA"),file = OUTPUT_ALPHA)
 
-# haplotype_pip = np.mean(haplotype_burnt_gamma,axis = 0)
+		OUTPUT_BETA = open(args.output+"_beta.txt","w")
+		print("haplotype_block\tbeta_mean\tbeta_sd\tpip",file = OUTPUT_BETA)
+		for i in range(X.shape[1]):
+			print("%s\t%s\t%s\t%s" %(hap_names[i],"NA","NA","NA"),file = OUTPUT_BETA)
 
-# OUTPUT_HAP = open(args.output+"_haplotype_pip.txt","w")
-
-# for i in range(len(hap_names)):
-# 	print("%s\t%f" %(hap_names[i],haplotype_pip[i]),file = OUTPUT_HAP)
-
-# block_haplotypes = {}
-# block_positions = []
-
-
-# for i in range(len(hap_names)):
-# 	block_name_ = re.compile("(.*@.*)_[0-9]+")
-# 	m = block_name_.search(hap_names[i])
-# 	if m.group(1) in block_haplotypes:
-# 		block_haplotypes[m.group(1)].append(i)
-# 	else:
-# 		block_haplotypes[m.group(1)] = [i]
-# 		block_positions.append(m.group(1))
-
-# block_pip_1 = uf.pip_calculation_1(haplotype_burnt_gamma,block_haplotypes,block_positions)
-
-
-# OUTPUT_BLOCK_1 = open(args.output+"_block_pip.txt","w")
-# for i in range(len(block_pip_1)):
-# 	print("%s\t%s" %(block_positions[i],block_pip_1[i]),file = OUTPUT_BLOCK_1)
-
-
+if __name__ == "__main__":
+	main()
