@@ -16,7 +16,7 @@ import block_partition as bp
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-v',type = str, action= 'store',dest='vcf',help='the vcf file')
-parser.add_argument('-b',type = str, action= 'store',dest='block')
+parser.add_argument('-b',type = str, action= 'store',dest='block',default = "bigld")
 parser.add_argument('-r',type = float, action = 'store', dest = 'corr',default=0.1)
 parser.add_argument('-c',type = float, action = 'store', dest = 'CLQcut',default=0.5)
 parser.add_argument('-w',type = int, action = 'store', dest = 'window',default = 100)
