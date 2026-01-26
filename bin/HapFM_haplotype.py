@@ -14,16 +14,8 @@ import os
 import utility_functions as uf
 import block_partition as bp
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-v',type = str, action= 'store',dest='vcf',help='the vcf file')
-parser.add_argument('-b',type = str, action= 'store',dest='block',default = "bigld")
-parser.add_argument('-r',type = float, action = 'store', dest = 'corr',default=0.1)
-parser.add_argument('-c',type = float, action = 'store', dest = 'CLQcut',default=0.5)
-parser.add_argument('-w',type = int, action = 'store', dest = 'window',default = 100)
-parser.add_argument('-hc',type = str, action = 'store', dest = 'clustering',help = "haplotype clustering method",default = "xmeans")
-parser.add_argument('-o',type = str, action = 'store', dest = 'output',help = "the prefix of the output files")
 
-args = parser.parse_args()
+args = uf.parse_arguments_haplotype()
 
 
 print("program has started")
@@ -31,7 +23,7 @@ print("program has started")
 DIR = os.path.realpath(os.path.dirname(__file__))
 
 ########################## create the genotype matrix from vcf file
-hap_matrix_d1,hap_matrix_d2,variant_names,variant_positions,chromosome = uf.vcf2hapmatrix(vcf=args.vcf) # n*m matrix with n individuals and m snps
+hap_matrix_d1,hap_matrix_d2,variant_names,variant_positions,chromosome = uf.vcf_processing(vcf=args.vcf) # n*m matrix with n individuals and m snps
 
 geno_matrix = {}
 geno_matrix_standard = {}

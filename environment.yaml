@@ -241,3 +241,4 @@ dependencies:
       - pillow==11.1.0
       - pyclustering==0.10.1.2
       - pyparsing==3.2.1
+      - cyvcf2==0.31.4

@@ -20,6 +20,8 @@ from scipy.cluster.hierarchy import linkage
 from scipy.cluster.hierarchy import fcluster
 
 import geweke
+from cyvcf2 import VCF
+
 
 
 ## TO WORK AROUND THE NUMPY WARNING BUG
@@ -43,48 +45,80 @@ preprocessing steps:
 
 '''
 
-def vcf2hapmatrix(vcf):
+# def vcf2hapmatrix(vcf):
+# 	hap_matrix_d1 = {} #haplotype 1 of individuals, key as chromosome number
+# 	hap_matrix_d2 = {} #haplotype 2 of individuals, key as chromosome number
+# 	variant_names = {}
+# 	variant_positions = {} #key as chromosome number
+# 	chromosome = [] #key as chromosome number and value as number of SNPs per chromosome
+	
+# 	with open(vcf,"r") as VCF:
+# 		for line in VCF:
+# 			if re.search("^##",line): ## skip the first annotation lines
+# 				continue
+# 			elif re.search("^#CHROM",line): ## acquire the sample name information
+# 				line = line.strip("\n")
+# 				ind_names = line.split("\t")[9:]
+# 			else:
+# 				line = line.strip("\n")
+# 				items = line.split("\t")
+# 				ch = items[0]
+
+# 				if ch not in chromosome:
+# 					chromosome.append(ch)
+# 					variant_names[ch] = [items[2]]
+# 					variant_positions[ch] = [int(items[1])]
+# 					hap_matrix_d1[ch] = []
+# 					hap_matrix_d2[ch] = []
+# 					genotype = items[9:]
+# 					for i in range(len(genotype)):
+# 						m = re.search('([0-9])\|([0-9])',genotype[i])
+# 						hap_matrix_d1[ch].append(int(m.group(1)))
+# 						hap_matrix_d2[ch].append(int(m.group(2)))
+# 				else:
+# 					variant_names[ch].append(items[2])
+# 					variant_positions[ch].append(int(items[1]))
+# 					genotype = items[9:]
+# 					for i in range(len(genotype)):
+# 						m = re.search('([0-9])\|([0-9])',genotype[i])
+# 						hap_matrix_d1[ch].append(int(m.group(1)))
+# 						hap_matrix_d2[ch].append(int(m.group(2)))
+
+# 	for ch in chromosome:
+# 		hap_matrix_d1[ch] = np.reshape(np.asarray(hap_matrix_d1[ch],dtype=int),(len(variant_names[ch]),len(ind_names)))
+# 		hap_matrix_d2[ch] = np.reshape(np.asarray(hap_matrix_d2[ch],dtype=int),(len(variant_names[ch]),len(ind_names)))
+
+# 	return(hap_matrix_d1,hap_matrix_d2,variant_names,variant_positions,chromosome)
+
+def vcf_processing(vcf):
 	hap_matrix_d1 = {} #haplotype 1 of individuals, key as chromosome number
 	hap_matrix_d2 = {} #haplotype 2 of individuals, key as chromosome number
 	variant_names = {}
 	variant_positions = {} #key as chromosome number
 	chromosome = [] #key as chromosome number and value as number of SNPs per chromosome
-	
-	with open(vcf,"r") as VCF:
-		for line in VCF:
-			if re.search("^##",line): ## skip the first annotation lines
-				continue
-			elif re.search("^#CHROM",line): ## acquire the sample name information
-				line = line.strip("\n")
-				ind_names = line.split("\t")[9:]
-			else:
-				line = line.strip("\n")
-				items = line.split("\t")
-				ch = items[0]
 
-				if ch not in chromosome:
-					chromosome.append(ch)
-					variant_names[ch] = [items[2]]
-					variant_positions[ch] = [int(items[1])]
-					hap_matrix_d1[ch] = []
-					hap_matrix_d2[ch] = []
-					genotype = items[9:]
-					for i in range(len(genotype)):
-						m = re.search('([0-9])\|([0-9])',genotype[i])
-						hap_matrix_d1[ch].append(int(m.group(1)))
-						hap_matrix_d2[ch].append(int(m.group(2)))
-				else:
-					variant_names[ch].append(items[2])
-					variant_positions[ch].append(int(items[1]))
-					genotype = items[9:]
-					for i in range(len(genotype)):
-						m = re.search('([0-9])\|([0-9])',genotype[i])
-						hap_matrix_d1[ch].append(int(m.group(1)))
-						hap_matrix_d2[ch].append(int(m.group(2)))
+	for v in VCF(vcf):
+		ch = v.CHROM
+		if ch not in chromosome:
+			chromosome.append(ch)
+			variant_names[ch] = []
+			hap_matrix_d1[ch] = []
+			hap_matrix_d2[ch] = []
+			variant_positions[ch] = []
+
+		variant_names[ch].append(v.ID)
+		variant_positions[ch].append(v.POS)
+		hap_matrix_d1[ch].append(np.array(v.genotypes, dtype=np.int16)[:,0])
+		hap_matrix_d2[ch].append(np.array(v.genotypes, dtype=np.int16)[:,1])
+
+		phased = np.sum(np.array(v.genotypes, dtype=np.int16)[:,2])
+
+		if phased != len(np.array(v.genotypes, dtype=np.int16)[:,0]):
+			sys.exit("FOUND unphased genotype, please make sure used completely phased vcf")
 
 	for ch in chromosome:
-		hap_matrix_d1[ch] = np.reshape(np.asarray(hap_matrix_d1[ch],dtype=int),(len(variant_names[ch]),len(ind_names)))
-		hap_matrix_d2[ch] = np.reshape(np.asarray(hap_matrix_d2[ch],dtype=int),(len(variant_names[ch]),len(ind_names)))
+		hap_matrix_d1[ch] = np.vstack(hap_matrix_d1[ch])
+		hap_matrix_d2[ch] = np.vstack(hap_matrix_d2[ch])
 
 	return(hap_matrix_d1,hap_matrix_d2,variant_names,variant_positions,chromosome)
 
@@ -656,10 +690,10 @@ def convergence_geweke_test(trace,top5_beta_trace,start,end):
 def parse_arguments_mapping():
 
 	parser = argparse.ArgumentParser()
-	parser.add_argument('-i',type = str, action = 'store', dest = 'input')
-	parser.add_argument('-c',type = str, action = 'store', dest = 'covariates')
-	parser.add_argument('-y',type = str, action = 'store', dest = 'phenotype')
-	parser.add_argument('-a',type = str, action = 'store', dest = 'annotation')
+	parser.add_argument('-i',type = str, action = 'store', dest = 'the input haplotypeDM file')
+	parser.add_argument('-c',type = str, action = 'store', dest = 'the covariate file, tab deliminated without header')
+	parser.add_argument('-y',type = str, action = 'store', dest = 'the phenotype file with one column and no header')
+	parser.add_argument('-a',type = str, action = 'store', dest = 'the annotation file (beta version)')
 	parser.add_argument('-n',type = int, action = 'store', default = 5, dest = "num", help = 'number of MCMC chains run parallelly')
 	parser.add_argument('-m',type = int, action = 'store', default = 1, dest = 'mode',help = "1:no annotation; 2:with annotation file")
 	parser.add_argument('-s0',type = float, action = 'store', dest = 's0',default = 0.05, help = "the proportion of phenotypic variation explained by background variables")
@@ -669,5 +703,20 @@ def parse_arguments_mapping():
 	args = parser.parse_args()
 
 	return(args)
+
+def parse_arguments_haplotype():
+
+	parser = argparse.ArgumentParser()
+	parser.add_argument('-v',type = str, action= 'store',dest='vcf',help='the input vcf file')
+	parser.add_argument('-b',type = str, action= 'store',dest='block',default = "bigld",help="block partition method: bigld or previously defined blocks")
+	parser.add_argument('-r',type = float, action = 'store', dest = 'corr',default=0.1, help = "r2 for independent LD blocks")
+	parser.add_argument('-w',type = int, action = 'store', dest = 'window',default = 100, help = "sliding window size for calcualting the independent LD blocks")
+	parser.add_argument('-c',type = float, action = 'store', dest = 'CLQcut',default=0.5, help = "bigLD parameter, LD block r2 cutoff")
+	parser.add_argument('-hc',type = str, action = 'store', dest = 'clustering',help = "haplotype clustering method",default = "xmeans")
+	parser.add_argument('-o',type = str, action = 'store', dest = 'output',help = "the prefix of the output files")
+	args = parser.parse_args()
+
+	return(args)
+
 
 
