@@ -20,7 +20,7 @@ HapFM requires bgzip-compressed and indexed VCF files as input and assumes that 
 
 ```bgzip example.vcf```
 
-```tabix -p vcf example.vcf```
+```tabix -p vcf example.vcf.gz```
 
 ### 1.2 Perform block partition and generate haplotype design matrix
 
