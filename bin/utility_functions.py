@@ -50,12 +50,12 @@ def parse_arguments_mapping():
 def parse_arguments_haplotype():
 
 	parser = argparse.ArgumentParser()
-	parser.add_argument('-v',type = str, action= 'store',dest='vcf',help='the input vcf file')
-	parser.add_argument('-b',type = str, action= 'store',dest='block',default = "bigld",help="block partition method: bigld or previously defined blocks")
-	parser.add_argument('-r',type = float, action = 'store', dest = 'corr',default=0.1, help = "r2 for independent LD blocks")
-	parser.add_argument('-w',type = int, action = 'store', dest = 'window',default = 100, help = "sliding window size for calcualting the independent LD blocks")
-	parser.add_argument('-c',type = float, action = 'store', dest = 'CLQcut',default=0.5, help = "bigLD parameter, LD block r2 cutoff")
-	parser.add_argument('-hc',type = str, action = 'store', dest = 'clustering',help = "haplotype clustering method",default = "xmeans")
+	parser.add_argument('-v',type = str, action= 'store',dest='vcf',help='the input vcf file. Required')
+	parser.add_argument('-b',type = str, action= 'store',dest='block',default = "bigld",help="block partition method: bigld or previously defined blocks. Required")
+	parser.add_argument('-r',type = float, action = 'store', dest = 'corr',default=0.1, help = "r2 for independent LD blocks: 0-1. Default: 0.1")
+	parser.add_argument('-w',type = int, action = 'store', dest = 'window',default = 100, help = "sliding window size for calcualting the independent LD blocks. Default: 100")
+	parser.add_argument('-c',type = float, action = 'store', dest = 'CLQcut',default=0.5, help = "bigLD parameter, LD block r2 cutoff: 0-1. Default: 0.5)")
+	parser.add_argument('-hc',type = str, action = 'store', dest = 'clustering',help = "haplotype clustering method: xmeans, KNN, modularity, local. Default: xmeans",default = "xmeans")
 	parser.add_argument('-o',type = str, action = 'store', dest = 'output',help = "the prefix of the output files")
 	args = parser.parse_args()
 
@@ -266,7 +266,6 @@ def DBSCAN_clustering(np_array):
 
 def local_scale_Spectral(np_array):
 	r,c =np_array.shape
-	print(r,c)
 	k = max(int(r/10),10)
 
 	dists = squareform(pdist((np_array)))
