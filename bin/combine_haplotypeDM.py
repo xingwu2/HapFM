@@ -3,7 +3,7 @@ import pandas as pd
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-i',type = str, action = 'store', dest = 'names',help="the names of all haplotypeDM files to be combined, separated by comma")
-parser.add_argument('-o',type = str, action = 'store', dest = 'output',help="the names of all haplotypeDM files to be combined, separated by comma")
+parser.add_argument('-o',type = str, action = 'store', dest = 'output',help="the prefix of the output file")
 
 args = parser.parse_args()
 

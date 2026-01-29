@@ -30,65 +30,36 @@ import warnings
 np.warnings = warnings
 
 
+def parse_arguments_mapping():
 
-'''
-define functions
-'''
+	parser = argparse.ArgumentParser()
+	parser.add_argument('-i',type = str, action = 'store', dest ='input', help = 'the input haplotypeDM file')
+	parser.add_argument('-c',type = str, action = 'store', dest ='covariates',help = 'the covariate file, tab deliminated without header')
+	parser.add_argument('-y',type = str, action = 'store', dest ='phenotype',help = 'the phenotype file with one column and no header')
+	parser.add_argument('-a',type = str, action = 'store', dest = 'annotation',help = 'the annotation file (beta version)')
+	parser.add_argument('-n',type = int, action = 'store', default = 5, dest = "num", help = 'number of MCMC chains run parallelly')
+	parser.add_argument('-m',type = int, action = 'store', default = 1, dest = 'mode',help = "1:no annotation; 2:with annotation file")
+	parser.add_argument('-s0',type = float, action = 'store', dest = 's0',default = 0.05, help = "the proportion of phenotypic variation explained by background variables")
+	parser.add_argument('-v',type = int, action = 'store', default = 0, dest = 'verbose', help = "verbose levels 0: no stdout; 1: convergence and minimal stdout; 2: per MCMC iteration stdout")
+	parser.add_argument('-o',type = str, action = 'store', dest = 'output',help = "the prefix of the output files")
 
-''' 
+	args = parser.parse_args()
 
-preprocessing steps:
+	return(args)
 
-1. convert vcf to SNP matrix (sum of two haplotype matrix)
-2. LD measurement
-3. independent LD block partition  
+def parse_arguments_haplotype():
 
-'''
+	parser = argparse.ArgumentParser()
+	parser.add_argument('-v',type = str, action= 'store',dest='vcf',help='the input vcf file')
+	parser.add_argument('-b',type = str, action= 'store',dest='block',default = "bigld",help="block partition method: bigld or previously defined blocks")
+	parser.add_argument('-r',type = float, action = 'store', dest = 'corr',default=0.1, help = "r2 for independent LD blocks")
+	parser.add_argument('-w',type = int, action = 'store', dest = 'window',default = 100, help = "sliding window size for calcualting the independent LD blocks")
+	parser.add_argument('-c',type = float, action = 'store', dest = 'CLQcut',default=0.5, help = "bigLD parameter, LD block r2 cutoff")
+	parser.add_argument('-hc',type = str, action = 'store', dest = 'clustering',help = "haplotype clustering method",default = "xmeans")
+	parser.add_argument('-o',type = str, action = 'store', dest = 'output',help = "the prefix of the output files")
+	args = parser.parse_args()
 
-# def vcf2hapmatrix(vcf):
-# 	hap_matrix_d1 = {} #haplotype 1 of individuals, key as chromosome number
-# 	hap_matrix_d2 = {} #haplotype 2 of individuals, key as chromosome number
-# 	variant_names = {}
-# 	variant_positions = {} #key as chromosome number
-# 	chromosome = [] #key as chromosome number and value as number of SNPs per chromosome
-	
-# 	with open(vcf,"r") as VCF:
-# 		for line in VCF:
-# 			if re.search("^##",line): ## skip the first annotation lines
-# 				continue
-# 			elif re.search("^#CHROM",line): ## acquire the sample name information
-# 				line = line.strip("\n")
-# 				ind_names = line.split("\t")[9:]
-# 			else:
-# 				line = line.strip("\n")
-# 				items = line.split("\t")
-# 				ch = items[0]
-
-# 				if ch not in chromosome:
-# 					chromosome.append(ch)
-# 					variant_names[ch] = [items[2]]
-# 					variant_positions[ch] = [int(items[1])]
-# 					hap_matrix_d1[ch] = []
-# 					hap_matrix_d2[ch] = []
-# 					genotype = items[9:]
-# 					for i in range(len(genotype)):
-# 						m = re.search('([0-9])\|([0-9])',genotype[i])
-# 						hap_matrix_d1[ch].append(int(m.group(1)))
-# 						hap_matrix_d2[ch].append(int(m.group(2)))
-# 				else:
-# 					variant_names[ch].append(items[2])
-# 					variant_positions[ch].append(int(items[1]))
-# 					genotype = items[9:]
-# 					for i in range(len(genotype)):
-# 						m = re.search('([0-9])\|([0-9])',genotype[i])
-# 						hap_matrix_d1[ch].append(int(m.group(1)))
-# 						hap_matrix_d2[ch].append(int(m.group(2)))
-
-# 	for ch in chromosome:
-# 		hap_matrix_d1[ch] = np.reshape(np.asarray(hap_matrix_d1[ch],dtype=int),(len(variant_names[ch]),len(ind_names)))
-# 		hap_matrix_d2[ch] = np.reshape(np.asarray(hap_matrix_d2[ch],dtype=int),(len(variant_names[ch]),len(ind_names)))
-
-# 	return(hap_matrix_d1,hap_matrix_d2,variant_names,variant_positions,chromosome)
+	return(args)
 
 def vcf_processing(vcf):
 	hap_matrix_d1 = {} #haplotype 1 of individuals, key as chromosome number
@@ -579,19 +550,6 @@ def cat(dictionary,keys):
 
 
 
-# def pip_calculation_1(haplotype_burnt_gamma,block_haplotypes,block_positions):
-
-# 	nrow = haplotype_burnt_gamma.shape[0]
-# 	ncol = len(block_haplotypes)
-# 	block_gamma = np.zeros(shape = (nrow,ncol))
-# 	for i in range(len(block_positions)):
-# 		col_index = block_haplotypes[block_positions[i]]
-# 		x = np.sum(haplotype_burnt_gamma[:,col_index],axis = 1)
-# 		row_index = np.where(x >= 1)
-# 		block_gamma[row_index[0],i] = 1
-# 	block_pip = np.mean(block_gamma,axis = 0)
-# 	return(block_pip)
-
 def block_pip_calculation(gamma_trace,block_haplotypes,block_positions):
 
 	nrow = gamma_trace.shape[0] ## number of MCMC iterations
@@ -607,6 +565,35 @@ def block_pip_calculation(gamma_trace,block_haplotypes,block_positions):
 
 
 
+def block_gamma(gamma,block_haplotypes,block_positions):
+
+	block_gamma = np.zeros(len(block_positions))
+	for i in range(len(block_positions)):
+		index = block_haplotypes[block_positions[i]]
+		block_sum = np.sum(gamma[index])
+
+		if block_sum >= 1:
+			block_gamma[i] = 1
+	return(block_gamma)
+
+def fdr_calculation(pip):
+
+	ordered_index = np.argsort(pip)[::-1]
+
+	sorted_pip = pip[ordered_index]
+
+	## FDR calculation from sorted pip values
+
+	fdr = []
+
+	for i in range(len(sorted_pip)):
+		if i == 0:
+			fdr.append( 1 - sorted_pip[i])
+		else:
+			fdr.append( 1 - np.mean(sorted_pip[:i+1]))
+
+	return(ordered_index,fdr)
+
 def pip_calculation_2(haplotype_pip,block_haplotypes,block_positions):
 
 	block_pip = np.zeros(len(block_haplotypes))
@@ -619,8 +606,6 @@ def pip_calculation_2(haplotype_pip,block_haplotypes,block_positions):
 		block_pip[i] = 1 - block_pip_
 
 	return(block_pip)
-
-
 
 def pip_calculation_max(haplotype_pip,block_haplotypes,block_positions):
 
@@ -687,36 +672,7 @@ def convergence_geweke_test(trace,top5_beta_trace,start,end):
     if np.amax(max_z) < 1.5:
         return(1)
 
-def parse_arguments_mapping():
 
-	parser = argparse.ArgumentParser()
-	parser.add_argument('-i',type = str, action = 'store', dest = 'the input haplotypeDM file')
-	parser.add_argument('-c',type = str, action = 'store', dest = 'the covariate file, tab deliminated without header')
-	parser.add_argument('-y',type = str, action = 'store', dest = 'the phenotype file with one column and no header')
-	parser.add_argument('-a',type = str, action = 'store', dest = 'the annotation file (beta version)')
-	parser.add_argument('-n',type = int, action = 'store', default = 5, dest = "num", help = 'number of MCMC chains run parallelly')
-	parser.add_argument('-m',type = int, action = 'store', default = 1, dest = 'mode',help = "1:no annotation; 2:with annotation file")
-	parser.add_argument('-s0',type = float, action = 'store', dest = 's0',default = 0.05, help = "the proportion of phenotypic variation explained by background variables")
-	parser.add_argument('-v',type = int, action = 'store', default = 0, dest = 'verbose', help = "verbose levels 0: no stdout; 1: convergence and minimal stdout; 2: per MCMC iteration stdout")
-	parser.add_argument('-o',type = str, action = 'store', dest = 'output',help = "the prefix of the output files")
-
-	args = parser.parse_args()
-
-	return(args)
-
-def parse_arguments_haplotype():
-
-	parser = argparse.ArgumentParser()
-	parser.add_argument('-v',type = str, action= 'store',dest='vcf',help='the input vcf file')
-	parser.add_argument('-b',type = str, action= 'store',dest='block',default = "bigld",help="block partition method: bigld or previously defined blocks")
-	parser.add_argument('-r',type = float, action = 'store', dest = 'corr',default=0.1, help = "r2 for independent LD blocks")
-	parser.add_argument('-w',type = int, action = 'store', dest = 'window',default = 100, help = "sliding window size for calcualting the independent LD blocks")
-	parser.add_argument('-c',type = float, action = 'store', dest = 'CLQcut',default=0.5, help = "bigLD parameter, LD block r2 cutoff")
-	parser.add_argument('-hc',type = str, action = 'store', dest = 'clustering',help = "haplotype clustering method",default = "xmeans")
-	parser.add_argument('-o',type = str, action = 'store', dest = 'output',help = "the prefix of the output files")
-	args = parser.parse_args()
-
-	return(args)
 
 
 

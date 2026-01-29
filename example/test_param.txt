@@ -1,0 +1,7 @@
+alpha_norm_2	2.589991	1.157691
+beta_norm_2	6.253213	0.241988
+sigma_1	1.550837	0.335821
+sigma_e	3.123964	0.064414
+large_beta_ratio	0.050371	0.008633
+total_heritability	0.728237	0.024582
+sum_gamma	15.847940	3.493642

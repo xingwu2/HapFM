@@ -159,7 +159,7 @@ def sample_beta_numba(y, C_alpha, H_beta, H, beta, gamma, sigma_0, sigma_1, sigm
     
 	return (beta, H_beta)
 
-def sampling(verbose,y,C,H,sig0_initiate,iters,prefix,block_haplotypes,block_positions,num,trace_container,gamma_container,beta_container,alpha_container,convergence_container):
+def sampling(verbose,y,C,H,sig0_initiate,block_haplotypes,block_positions,num,trace_container,gamma_container,beta_container,alpha_container,block_gamma_container,convergence_container):
 
 	## set random seed for the process
 	np.random.seed(int(time.time()) + os.getpid())
@@ -277,7 +277,7 @@ def sampling(verbose,y,C,H,sig0_initiate,iters,prefix,block_haplotypes,block_pos
 				convergence_scores = np.zeros(len(convergence_end_iter))
 
 				for s in range(num_convergence_test):
-					convergence_scores[s] = uf.convergence_geweke_test(trace,top5_beta_trace,convergence_start_iter-burn_in_iter,convergence_end_iter[s]-burn_in_iter)
+					convergence_scores[s] = uf.convergence_geweke_test(trace[:,[0,1,3,4,5]],top5_beta_trace,convergence_start_iter-burn_in_iter,convergence_end_iter[s]-burn_in_iter)
 
 				if np.sum(convergence_scores) == num_convergence_test:
 					convergence_container[num] = 1
@@ -317,6 +317,7 @@ def sampling(verbose,y,C,H,sig0_initiate,iters,prefix,block_haplotypes,block_pos
 		alpha_mean = np.zeros(C_c)
 		beta_mean = np.zeros(H_c)
 		gamma_sum = np.zeros(H_c)
+		block_gamma_sum = np.zeros(len(block_positions))
 
 		alpha_M2 = np.zeros(C_c)
 		beta_M2 = np.zeros(H_c)
@@ -365,6 +366,7 @@ def sampling(verbose,y,C,H,sig0_initiate,iters,prefix,block_haplotypes,block_pos
 				beta_mean,beta_M2 = uf.welford(beta_mean,beta_M2,beta,it)
 				alpha_mean,alpha_M2 = uf.welford(alpha_mean,alpha_M2,alpha,it)
 				gamma_sum += gamma
+				block_gamma_sum += uf.block_gamma(gamma,block_haplotypes,block_positions)
 
 				if verbose > 0:
 					if it > 0 and it % 2000 == 0:
@@ -383,6 +385,8 @@ def sampling(verbose,y,C,H,sig0_initiate,iters,prefix,block_haplotypes,block_pos
 
 		gamma_container[num] = gamma_sum / posterior_draws
 
+		block_gamma_container[num] = block_gamma_sum / posterior_draws
+
 	else:
 		trace_container[num] = []
 
@@ -396,169 +400,7 @@ def sampling(verbose,y,C,H,sig0_initiate,iters,prefix,block_haplotypes,block_pos
 
 		gamma_container[num] = []
 
-
-def sampling_w_annotation(y,C,HapDM,annotation,sig0_initiate,sig1_initiate,sige_initiate,pie_initiate,step_size,iters,prefix):
-
-	#initiate beta,gamma and H matrix
-	H_r,H_c = H.shape
-
-	##specify hyper parameters
-	pie_a = 1
-	pie_b = H_c / 10
-	a_sigma = 1
-	b_sigma = 1
-	a_e = 1
-	b_e = 1
-
-	sigma_0 = sig0_initiate
-	sigma_1 = sig1_initiate
-	sigma_e = sige_initiate
-	pie = pie_initiate
-	
-	print("initiate:",sigma_1,sigma_e,pie)
-
-	H = np.array(HapDM)
-
-	#initiate alpha, alpha_trace, beta_trace and gamma_trace
-
-	it = 0
-	burn_in_iter = 2000
-	trace = np.empty((iters-2000,6))
-	alpha_trace = np.empty((iters-2000,C_c))
-	theta_trace = np.empty((iters-2000,annotation.shape[1]))
-	gamma_trace = np.empty((iters-2000,H_c))
-	beta_trace = np.empty((iters-2000,H_c))
-	top5_beta_trace = np.empty((iters-2000,5))
+		block_gamma_container[num] = []
 
 
-	alpha = np.random.random(size = C_c)
-
-	theta = np.append(sp.stats.norm.ppf(pie_initiate),np.repeat(0,annotation.shape[1]-1))
-	
-	Z = np.matmul(annotation,theta)
-	pie = sp.stats.norm.cdf(Z)
-
-	gamma = np.random.binomial(1,pie_initiate,H_c)
-	
-	beta = np.array(np.zeros(H_c))
-	for i in range(H_c):
-		if gamma[i] == 0:
-			beta[i] = np.random.normal(0,sigma_0)
-		else:
-			beta[i] = np.random.normal(0,sigma_1) 
-
-
-	H_beta = np.matmul(H,beta)
-	C_alpha = np.matmul(C,alpha)
-	#start sampling
-
-	while it < iters:
-		before = time.time()
-		Z = sample_Z(theta,gamma,annotation)
-		theta = sample_theta(annotation,Z)
-		gamma = sample_gamma_annotation(beta,gamma,sigma_0,sigma_1,annotation,theta)
-		sigma_1 = sample_sigma_1(beta,gamma,a_sigma,b_sigma)
-		sigma_e = sample_sigma_e(y,H_beta,C_alpha,a_e,b_e)
-		alpha,C_alpha = sample_alpha(y,H_beta,C_alpha,C,alpha,sigma_e)
-		beta,H_beta = sample_beta(y,C_alpha,H_beta,H,beta,gamma,sigma_0,sigma_1,sigma_e)
-		after = time.time()
-		genetic_var = np.var(H_beta)
-		
-		pheno_var = np.var(y - C_alpha)
-		large_beta = np.absolute(beta) > 0.3
-		large_beta_ratio = np.sum(large_beta) / len(beta)
-		large_pie = sp.stats.norm.cdf(Z_update) > 0.1
-		large_pie_ratio = np.sum(large_pie) / len(Z_update)
-		total_heritability = genetic_var / pheno_var
-
-
-		if it > 100 and  total_heritability > 1:
-			print("unrealistic beta sample",genetic_var,pheno_var)
-			continue
-		else:
-			if it >= burn_in_iter:
-				trace[it-burn_in_iter,:] = [it,sigma_1,sigma_e,large_beta_ratio,large_pie_ratio,total_heritability]
-				gamma_trace[it-burn_in_iter,:] = gamma
-				beta_trace[it-burn_in_iter,:] = beta
-				alpha_trace[it-burn_in_iter,:] = alpha
-				theta_trace[it-burn_in_iter,:] = theta
-				top5_beta_trace[it-burn_in_iter,:] = np.sort(np.absolute(beta))[::-1][:5]
-
-			if it >= burn_in_iter + 9999: # after burn-in iterations, test convergence
-
-				max_z = []
-
-				# for t in range(len(theta)):
-				#  	after_burnin_theta = theta_trace[:,t]
-				#  	theta_zscores = pm3.geweke(after_burnin_theta)[:,1]
-				#  	max_z.append(np.amax(np.absolute(theta_zscores)))
-
-				for a in range(C_c):
-					after_burnin_alpha = alpha_trace[:,a]
-					alpha_zscores = geweke.geweke(after_burnin_alpha)[:,1]
-					max_z.append(np.amax(np.absolute(alpha_zscores)))
-
-				for b in range(5):
-					after_burnin_beta = top5_beta_trace[:,b]
-					beta_zscores = geweke.geweke(after_burnin_beta)[:,1]
-					max_z.append(np.amax(np.absolute(beta_zscores)))
-
-				#convergence for large beta ratio
-				after_burnin_pie = trace[:,4]
-				pie_zscores = geweke.geweke(after_burnin_pie)[:,1]
-				max_z.append(np.amax(np.absolute(pie_zscores)))
-
-				#convergence for large pi ratio
-				after_burnin_beta_ratio = trace[:,3]
-				pie_zscores = geweke.geweke(after_burnin_beta_ratio)[:,1]
-				max_z.append(np.amax(np.absolute(pie_zscores)))
-
-				#convergence for total heritability
-				after_burnin_var = trace[:,5]
-				var_zscores = geweke.geweke(after_burnin_var)[:,1]
-				max_z.append(np.amax(np.absolute(var_zscores)))
-
-				#convergence for sigma_1
-				after_burnin_sigma1 = trace[:,1]
-				sigma1_zscores = geweke.geweke(after_burnin_sigma1)[:,1]
-				max_z.append(np.amax(np.absolute(sigma1_zscores)))
-
-				#convergence for sigma_e
-				after_burnin_sigmae = trace[:,2]
-				sigmae_zscores = geweke.geweke(after_burnin_sigmae)[:,1]
-				max_z.append(np.amax(np.absolute(sigmae_zscores)))
-				
-				if  np.amax(max_z) < 1.5:
-					print("convergence has been reached at %i iterations." %(it))
-					break
-
-				else:
-					trace_ = np.empty((1000,6))
-					gamma_trace_ = np.empty((1000,H_c))
-					beta_trace_ = np.empty((1000,H_c))
-					alpha_trace_ = np.empty((1000,C_c))
-					theta_trace_ = np.empty((1000,annotation.shape[1]))
-					top5_beta_trace_ = np.empty((1000,5))
-
-					trace = np.concatenate((trace[-(iters - burn_in_iter-1000):,:],trace_),axis=0)
-					gamma_trace = np.concatenate((gamma_trace[-(iters - burn_in_iter-1000):,:],gamma_trace_),axis=0)
-					beta_trace = np.concatenate((beta_trace[-(iters - burn_in_iter-1000):,:],beta_trace_),axis=0)
-					alpha_trace = np.concatenate((alpha_trace[-(iters - burn_in_iter-1000):,:],alpha_trace_),axis=0)
-					theta_trace = np.concatenate((theta_trace[-(iters - burn_in_iter-1000):,:],theta_trace_),axis=0)
-					top5_beta_trace = np.concatenate((top5_beta_trace[-(iters - burn_in_iter-1000):,:],top5_beta_trace_),axis = 0)
-
-					burn_in_iter += 1000
-					iters += 1000
-
-			if (it - burn_in_iter) >= 0 and (it - burn_in_iter ) % 1000 == 0:
-				print("%i iterations have sampled" %(it), str(after - before),trace[it-burn_in_iter,:])
-
-			it += 1
-
-	trace = pd.DataFrame(trace)
-	alpha_trace = pd.DataFrame(alpha_trace)
-	beta_trace = pd.DataFrame(beta_trace)
-	gamma_trace = pd.DataFrame(gamma_trace)
-	theta_trace = pd.DataFrame(theta_trace)
-	return(trace,alpha_trace,beta_trace,gamma_trace,theta_trace)
 
