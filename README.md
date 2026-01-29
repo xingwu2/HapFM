@@ -71,7 +71,10 @@ python bin/HapFM_haplotype.py -v chr1.vcf.gz -b bigld -o chr1
 ```
 python bin/combine_haplotypeDM.py -i chr1_haplotypeDM.txt,chr2_haplotypeDM.txt,chr3_haplotypeDM.txt,chr4_haplotypeDM.txt -o combined
 ```
-c. Users can input their own block partitions as long as it follows the format ``` chromosome  start_index  end_index```
+c. Users can input their own block partitions as long as it follows the format 
+
+``` chromosome  start_index  end_index```
+
 ```
 python3 bin/HapFM_haplotype.py -v example.vcf.gz -b user_custome_block_partition.txt -o output
 ```
