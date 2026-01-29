@@ -1,40 +1,164 @@
-# HapFM
+# Haplotype-based trait Fine Mapping (HapFM)
+<img width="1500" height="1000" alt="image" src="https://github.com/user-attachments/assets/4638ace8-1096-4581-98b8-a3f6e7b021ec" />
 
-HapFM has 2 main functions: genome-wide haplotype block partition and haplotype-based fine-mapping.
-
-## Installation
-
-HapFM can be install both manually and via conda/mamba package managers. 
-
-### Install via conda/mamba (recommended because it is one push button)
-
-```mamba env create -f environment.yml```  
-```conda activate hapfm```
-
-### Install mannually (if you have the patience and want to practice installing softwares)
-
-Please first ensure python3 and R are in your environment path. Then install these modules/libraries
-
-python3: numpy,scipy,pandas,networkx,pyclustering and scikit-learn
-
-R: gpart and optparse
-
-## Usage
-
-### Haplotype block partition and cluster formation
-The default command line for the step is  
-```python3 bin/HapFM_haplotype.py -v VCF -b bigld -o output```
-
-The output file (haplotypeDM) will become the input of the haplotype-based fine-mapping step.
-
-### Haplotype-based fine-mapping
-The default command line for the step is  
-```python3 bin/HapFM_mapping.py -i haplotypeDM -c covariates -y phenotype -o output```
-
-
-## Citation
+# Citation
 Wu X, Jiang W, Fragoso C, Huang J, Zhou G, Zhao H, et al. (2022) Prioritized candidate causal haplotype blocks in plant genome-wide association studies. PLoS Genet 18(10): e1010437. https://doi.org/10.1371/journal.pgen.1010437
 
+# Installation via mamba
+
+```mamba env create -f environment.yaml```  
+```conda activate hapfm```
+
+# User manual
+
+HapFM has two main functions: (1) converting SNP VCF files into a haplotype-coded matrix, and (2) performing statistical fine-mapping to prioritize candidate causal genomic regions.
+
+## 1. Genome-wide haplotype block partition and haplotype clustering
+
+### 1.1 Prepare the input vcf
+HapFM requires bgzip-compressed and indexed VCF files as input and assumes that all genotypes are **phased** with **no missing data**.
+
+```bgzip example.vcf```
+
+```tabix -p vcf example.vcf```
+
+### 1.2 Perform block partition and generate haplotype design matrix
+
+```
+python3 bin/HapFM_haplotype.py -h
+
+usage: HapFM_haplotype.py [-h] [-v VCF] [-b BLOCK] [-r CORR] [-w WINDOW] [-c CLQCUT] [-hc CLUSTERING] [-o OUTPUT]
+
+options:
+  -h, --help      show this help message and exit
+  -v VCF          the input vcf file. Required
+  -b BLOCK        block partition method: bigld or previously defined blocks. Required
+  -r CORR         r2 for independent LD blocks: 0-1. Default: 0.1
+  -w WINDOW       sliding window size for calcualting the independent LD blocks. Default: 100
+  -c CLQCUT       bigLD parameter, LD block r2 cutoff: 0-1. Default: 0.5)
+  -hc CLUSTERING  haplotype clustering method: xmeans, KNN, modularity, local. Default: xmeans
+  -o OUTPUT       the prefix of the output files
+
+```
+
+Here is the default/minimal command that does block partition, haplotype clustering, and haplotype design matrix construction.
+
+```
+python3 bin/HapFM_haplotype.py -v example.vcf.gz -b bigld -o output
+```
+### 1.3 Output files
+
+```alone_snps.txt```  This file contains SNPs that are not in linkage disequilibrium (LD) with any nearby SNPs.
+
+```block_names.txt```  This file contains the names of haplotype blocks in the format: ```chromosome@block_start_position-block_end_position```
+
+```fine_genomewide_partition.txt```  This file contains the SNP index boundaries for each block, in the format: ```chromosome  start_index  end_index```
+
+```haplotypeDM.txt```  This file contains the haplotype cluster design matrix and is used in the fine-mapping step
+
+```.bimbam```  This file contains the haplotype cluster design matrix in [bimbam_dosage format](https://www.chg.ox.ac.uk/~gav/qctool_v2/documentation/genotype_file_formats.html), which can be used by other GWAS tools like [GEMMA](https://github.com/genetics-statistics/GEMMA)
+
+```haplotype_names.txt```  this file contains all haplotypes in each LD block (each row represents a block)
+
+### 1.4 Troubleshoot or customize
+a. Please make sure your VCF is phased and has no missing data.
+
+b. For large genomes, we recommend running block partitioning with ```HapFM_haplotype.py``` separately for each chromosome and then combining the resulting haplotype design matrices at the end. This approach reduces computation time and memory usage required by BigLD.
+```
+python bin/HapFM_haplotype.py -v chr1.vcf.gz -b bigld -o chr1
+```
+
+```
+python bin/combine_haplotypeDM.py -i chr1_haplotypeDM.txt,chr2_haplotypeDM.txt,chr3_haplotypeDM.txt,chr4_haplotypeDM.txt -o combined
+```
+c. Users can input their own block partitions as long as it follows the format ``` chromosome  start_index  end_index```
+```
+python3 bin/HapFM_haplotype.py -v example.vcf.gz -b user_custome_block_partition.txt -o output
+```
+d. The choice of haplotype clustering algorithm affects both statistical power and mapping accuracy. Empirically, we found that xmeans is better than KNN, which in turn is better than modularity. However, we recommend that users explore different clustering algorithms for their own datasets. To avoid the long runtime of BigLD, users can first run the following command:
+
+```python bin/HapFM_haplotype.py -v example.vcf.gz -b bigld -o example```
+
+Then use the ```fine_genomewide_partition.txt``` as user-defined blocks and switch to a different haplotype clustering algorithm.
+
+```python bin/HapFM_haplotype.py -v example.vcf.gz -b example_fine_genomewide_partition.txt -hc KNN -o example_KNN```
+
+
+## 2 Bayesian statistical fine-mapping to prioritize candidate causal loci
+
+### 2.1 prepare the input files
+HapFM takes two required input files for the mapping step. 1) the **haplotypeDM** file generated by the previous step. 2) a single-column phenotype file (***missing data allowed but must be coded as NA***). 
+
+An example phenotype file is shown below:
+```
+7.39222029647234
+4.68403653228282
+-3.08826748723308
+NA
+-4.97452073997036
+-4.83682088409781
+0.359500195125896
+2.56758638105484
+-0.744043921372656
+```
+
+HapFM also allows users to provide a separate **tab-delimited covariate file without a header**. An example covariate file is shown below:
+```
+1	0.423480194993317	1.22388530476019
+1	-0.907006544526666	-1.27253705332987
+1	0.516026444733143	0.374653299339116
+1	0.764137232676148	0.715470849070698
+1	0.0579258194193244	2.93359348154627
+1	0.215968347620219	2.4402689859271
+1	-0.0465756426565349	0.720133360708132
+```
+### 2.2 Perform the statistical fine-mapping
+
+***In most cases, the statistical fine-mapping step may take hours to days to complete, depending on the dataset. We do not recommend running this step on personal computers.***
+
+```
+python3 bin/HapFM_mapping.py -h
+
+options:
+  -h, --help     show this help message and exit
+  -i INPUT       the input haplotypeDM file
+  -c COVARIATES  the covariate file, tab deliminated without header
+  -y PHENOTYPE   the phenotype file with one column and no header
+  -a ANNOTATION  the annotation file (beta version)
+  -n NUM         number of MCMC chains run parallelly
+  -m MODE        1:no annotation; 2:with annotation file
+  -s0 S0         the proportion of phenotypic variation explained by background variables
+  -v VERBOSE     verbose levels 0: no stdout; 1: convergence and minimal stdout; 2: per MCMC iteration stdout
+  -o OUTPUT      the prefix of the output files
+```
+
+Here is the default command for the mapping step:
+
+```
+python3 bin/HapFM_mapping.py -i test_haplotypeDM.txt -y test_y.txt -c test_covaraites.txt -o test
+```
+
+By default, the program combines results from five MCMC chains. If users want more accurate parameter estimation, they can increase the number of chains by setting the ```-n``` option. This step also supports multi-threading; therefore, increasing the number of chains can improve accuracy while taking advantage of parallel computation. 
+
+### 2.3 Output files
+```block_pip.txt```  This file contains the haplotype block posterior inclusion probability (PIP) and false discovery rate (FDR), sorted by FDR.
+```haplotype_beta.txt```  This files contains the estimated effect size and PIP for each haplotype.
+```alpha.txt``  this file contains the estimated effects for covaraites.
+```model_trace.txt``` This file contains the trace of model summary statistics from the converged MCMC chains.
+```param.txt``` this file contains the estimated model summary statistics
+
+### Troubleshoot
+
+a. It is ALWAYS good to check whether model has truly converged by plotting the trace values in ```model_trace.txt```.
+
+b. ```HapFM_mapping.py``` reports how many of the ```-n``` MCMC chains have reached convergence. If most chains have converged, the model parameter estimates can be considered more reliable.
+```
+5/5 chains have reached the convergence.
+```
+
+c. If very few chains have reached convergence, one possible solution is to increase -s0. The s0 parameter controls how much variance is explained by background SNPs. Larger s0 values can make the MCMC chains converge faster and better, but at the cost of detecting fewer significant loci.
+
+d. Since ```HapFM_haplotype.py``` also outputs a ```.bimbam``` file, users can choose an alternative mapping approach instead of our Bayesian statistical fine-mapping method (which is time-consuming and computationally expensive) and perform standard GWAS using tools such as: [GEMMA](https://github.com/genetics-statistics/GEMMA). 
 
 
 
