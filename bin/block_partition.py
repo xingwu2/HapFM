@@ -95,7 +95,7 @@ def CompleteLDPartition(standardized_genotype_matrix,cutoff,window_size):
 
 	return(boundary,alone_SNPs_index)
 
-def BigLD_partition(DIR,IndepLD_breakpoints_index,geno_matrix,variant_names,variant_positions,CLQcut,prefix):
+def BigLD_partition(DIR,IndepLD_breakpoints_index,geno_matrix,variant_names,variant_positions,CLQcut,prefix,ch,maf):
 	fine_breakpoints_ch = []
 
 	#generate geno and SNPinfo for BigLD
@@ -109,10 +109,10 @@ def BigLD_partition(DIR,IndepLD_breakpoints_index,geno_matrix,variant_names,vari
 		INFO = open(prefix+"_"+str(I)+"_snpINFO"+".btmp","w")
 		INFO.write("chrN\trsID\tbp\n")
 		for j in range(len(tmp_positions)):
-			INFO.write(str(1)+"\t"+str(tmp_names[j])+"\t"+str(tmp_positions[j])+"\n")
+			INFO.write(str(ch)+"\t"+str(tmp_names[j])+"\t"+str(tmp_positions[j])+"\n")
 		INFO.close()
 
-		BigLD_command = "Rscript "+DIR+"/BigLD.R -g "+prefix+"_"+str(I)+"_geno_matrix"+".btmp"+ " -s "+prefix+"_"+str(I)+"_snpINFO"+".btmp" + " -c " + str(CLQcut) + " -o " + prefix+"_"+str(I)
+		BigLD_command = "Rscript "+DIR+"/BigLD.R -g "+prefix+"_"+str(I)+"_geno_matrix"+".btmp"+ " -s "+prefix+"_"+str(I)+"_snpINFO"+".btmp" + " -c " + str(CLQcut) + " -m " + str(maf) + " -o " + prefix+"_"+str(I)
 		try:
 			blocks = []
 			subprocess.check_call(BigLD_command,shell=True)

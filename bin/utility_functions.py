@@ -5,6 +5,7 @@ import pandas as pd
 import scipy
 import networkx as nx
 import argparse
+import math
 
 from pyclustering.cluster.xmeans import xmeans
 from pyclustering.cluster.center_initializer import kmeans_plusplus_initializer
@@ -51,10 +52,11 @@ def parse_arguments_haplotype():
 
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-v',type = str, action= 'store',dest='vcf',help='the input vcf file. Required')
+	parser.add_argument('-maf',type = float, action = 'store', dest = 'maf',default=0.05, help = "SNPs with minor allele frequency (MAF) ≥ this value are used for independent and bigLD block partitioning. Default: 0.05")
 	parser.add_argument('-b',type = str, action= 'store',dest='block',default = "bigld",help="block partition method: bigld or previously defined blocks. Required")
-	parser.add_argument('-r',type = float, action = 'store', dest = 'corr',default=0.1, help = "r2 for independent LD blocks: 0-1. Default: 0.1")
+	parser.add_argument('-r1',type = float, action = 'store', dest = 'corr',default=0.1, help = "r2 for independent LD blocks: 0-1. Default: 0.1")
 	parser.add_argument('-w',type = int, action = 'store', dest = 'window',default = 100, help = "sliding window size for calcualting the independent LD blocks. Default: 100")
-	parser.add_argument('-c',type = float, action = 'store', dest = 'CLQcut',default=0.5, help = "bigLD parameter, LD block r2 cutoff: 0-1. Default: 0.5)")
+	parser.add_argument('-r2',type = float, action = 'store', dest = 'CLQcut',default=0.5, help = "r2 for bigLD fine LD block partitioning: 0-1. Default: 0.5)")
 	parser.add_argument('-hc',type = str, action = 'store', dest = 'clustering',help = "haplotype clustering method: xmeans, KNN, modularity, local. Default: xmeans",default = "xmeans")
 	parser.add_argument('-o',type = str, action = 'store', dest = 'output',help = "the prefix of the output files")
 	args = parser.parse_args()
@@ -77,7 +79,10 @@ def vcf_processing(vcf):
 			hap_matrix_d2[ch] = []
 			variant_positions[ch] = []
 
-		variant_names[ch].append(v.ID)
+		if v.ID == None:
+			variant_names[ch].append(str(ch) + "_" + str(v.POS))
+		else:
+			variant_names[ch].append(v.ID)		
 		variant_positions[ch].append(v.POS)
 		hap_matrix_d1[ch].append(np.array(v.genotypes, dtype=np.int16)[:,0])
 		hap_matrix_d2[ch].append(np.array(v.genotypes, dtype=np.int16)[:,1])
@@ -231,7 +236,7 @@ def xmeans_clustering(array):
 	amount_initial_centers = 2
 	initial_centers = kmeans_plusplus_initializer(array, amount_initial_centers).initialize()
 	# Create instance of X-Means algorithm. The algorithm will start analysis from 2 clusters, the maximum
-	# number of clusters that can be allocated is 20.
+	# number of clusters that can be allocated is 30.
 	xmeans_instance = xmeans(array, initial_centers, 30)
 	xmeans_instance.process()
 	# Extract clustering results: clusters and their centers
@@ -240,6 +245,7 @@ def xmeans_clustering(array):
 	for i in range(len(clusters_)):
 		for j in clusters_[i]:
 			clusters[j] = i
+	print(clusters)
 	return(clusters)
 
 def gmeans_clustering(array):
@@ -257,6 +263,35 @@ def affinity_propagation(np_array):
 	labels = AP.labels_
 	return(labels)
 
+def affinity_propagation_update(X, damping=0.7, preference=None):
+	"""
+    X: (n, m) haplotype matrix (0/1 or integer encoded)
+    """
+	X = np.asarray(X)
+	n = X.shape[0]
+	if n <= 1:
+		return np.zeros(n, dtype=int)
+
+    # Pairwise distance (Hamming or Euclidean)
+	dists = squareform(pdist(X, metric="hamming"))
+
+    # Convert distance to similarity
+	S = - (dists ** 2)
+
+    # Choose preference
+	if preference is None:
+		preference = np.median(S)   # very important!
+
+	AP = AffinityPropagation(
+		affinity="precomputed",
+		damping=damping,
+		preference=preference,
+		random_state=0
+	)
+
+	labels = AP.fit_predict(S)
+	return(labels)
+
 
 def DBSCAN_clustering(np_array):
 	r,c = np_array.shape
@@ -264,121 +299,101 @@ def DBSCAN_clustering(np_array):
 	labels = clusters.labels_
 	return(labels)
 
-def local_scale_Spectral(np_array):
+
+
+def local_scale_Spectral(np_array,eps=1e-12,k_max_eigs=30):
+
 	r,c =np_array.shape
-	k = max(int(r/10),10)
+	k = max(10, int(2*math.log(r)))
+	k = min(k, r - 2)
 
-	dists = squareform(pdist((np_array)))
-	knn_distances = np.sort(dists, axis=0)[k]
-	knn_distances = knn_distances[np.newaxis].T
-	local_scale = knn_distances.dot(knn_distances.T)
-	affinity_matrix = - dists * dists / local_scale
-	affinity_matrix[np.where(np.isnan(affinity_matrix))] = 0.0
-	affinity_matrix = np.exp(affinity_matrix)
-	np.fill_diagonal(affinity_matrix, 0)
+	D = squareform(pdist(np_array,metric="hamming"))
 
-	L = csgraph.laplacian(affinity_matrix,normed = True)
-	eig_val, eig_vec = np.linalg.eig(L)
-	eig_val = np.real(eig_val)
-	eig_vec = np.real(eig_vec)
-	
-	eig_vec = eig_vec[:,np.argsort(eig_val)]
-	eig_val = eig_val[np.argsort(eig_val)]
+	# sigma_i = distance to k-th neighbor (excluding self at position 0)
+	D_sorted = np.sort(D, axis=1)
+	sigma = D_sorted[:, k + 1]  # +1 because D_sorted[:,0] is self-distance 0
+	sigma = np.maximum(sigma, eps)
 
-	if sum(np.iscomplex(eig_val)) > 0:
-		print("Spectral Clustering failed. Clusters are assigned by affinity_propagation.")
-		print(np_array.shape)
-		labels = affinity_propagation(np_array)
-		print(max(labels))
-		if labels[0] == -1 or max(labels) == 0:
-			labels = np.arange(np_array.shape[0])
-			print("Affinity propagation failed")
-		
+	# Local scaling: exp( -d^2 / (sigma_i * sigma_j) )
+	S = np.outer(sigma, sigma)
+	S = np.maximum(S, eps)
+
+	W = np.exp(-(D * D) / S)
+	np.fill_diagonal(W, 0.0)
+	L = csgraph.laplacian(W, normed=True)
+	evals, evecs = np.linalg.eigh(L)
+
+	# Use eigengap on the smallest part of the spectrum
+	m = min(k_max_eigs, r - 1)
+	small = evals[:m]
+	gaps = np.diff(small)
+
+	# Ignore the trivial first eigenvalue near 0; search gaps starting from index 1
+	if len(gaps) < 2:
+		n_clusters = 1
 	else:
-		index_largest_gap = np.argsort(np.diff(eig_val))[::-1][0]
-		#print(index_largest_gap)
-		n_clusters = index_largest_gap + 2
-		V = eig_vec[:,:n_clusters]
-		Z = linkage(V, 'ward')
-		labels = fcluster(Z, n_clusters, criterion='maxclust') - 1
+		j = 1 + np.argmax(gaps[1:])  # j is the split point
+		n_clusters = j + 1
+
+	# Spectral embedding: take first n_clusters eigenvectors
+	V = evecs[:, :n_clusters]
+
+	# Row-normalize (common in Ng-Jordan-Weiss style)
+	V_norm = V / (np.linalg.norm(V, axis=1, keepdims=True) + eps)
+
+	# Cluster embedding (Ward on Euclidean in embedding space is fine)
+	Z = linkage(V_norm, method="ward")
+	labels = fcluster(Z, t=n_clusters, criterion="maxclust") - 1
+
+	#print(max(labels))
+
+
 	return(labels)
 
+def local_scale_modularity(np_array,eps=1e-12):
+	
+	r,c =np_array.shape
+	k = max(10, int(2*math.log(r)))
+	k_knn = min(k, r - 1)
+	k_sigma = min(k, r - 2)
 
-def local_scale_modularity(df):
-	r,c = df.shape
-	W = np.zeros(shape=(r,r))
-	k = max(int(r/10),5)
-	dists = squareform(pdist(df))
 
-	knn_distances = np.sort(dists, axis=0)[k]
-	knn_distances = knn_distances[np.newaxis].T
-	local_scale = knn_distances.dot(knn_distances.T)
-	W = - dists * dists / local_scale
+	D = squareform(pdist(np_array,metric="hamming"))
 
-	W[np.where(np.isnan(W))] = 0.0
-	W = np.exp(W)
-	np.fill_diagonal(W, 0)
+	# sigma_i = distance to k-th neighbor (excluding self at position 0)
+	D_sorted = np.sort(D, axis=1)
+	sigma = D_sorted[:, k_sigma + 1]  # +1 because D_sorted[:,0] is self-distance 0
+	sigma = np.maximum(sigma, eps)
 
-	connectivity = kneighbors_graph(X=df, n_neighbors=k, mode='connectivity')
+	# Local scaling: exp( -d^2 / (sigma_i * sigma_j) )
+	S = np.outer(sigma, sigma)
+	S = np.maximum(S, eps)
+
+	W = np.exp(-(D * D) / S)
+	np.fill_diagonal(W, 0.0)
+
+
+	connectivity = kneighbors_graph(X=np_array, n_neighbors=k_knn, mode='connectivity',metric="hamming",include_self=False)
 	connectivity = 0.5 * (connectivity + connectivity.T) ## make connectivity symmetric
 
 	connectivity_matrix = connectivity.toarray()
 	weighted_connectivity = np.multiply(W,connectivity_matrix)
 	G = nx.from_numpy_array(weighted_connectivity)
 	## this is a more stable function that the results can be reproduced due to the seed setting
-	louvain_partition = nx.community.louvain_communities(G,seed=k)
-	labels = np.zeros(r,dtype=int)
-	for i in range(r):
-		for k in range(len(louvain_partition)):
-			clusters_ = [*louvain_partition[k],]
-			for m in clusters_:
-				labels[m] = k
+	louvain_partition = nx.community.louvain_communities(G,seed=0)
+	labels = np.empty(r, dtype=int)
+	for cid, nodes in enumerate(louvain_partition):
+		labels[list(nodes)] = cid
+
 	return(labels)
 
+def KNN_Spectral(np_array,eps=1e-12, k_max_eigs=30):
 
-
-def Spectral_clustering(np_array):
 	r,c =np_array.shape
-	dists = squareform(pdist((np_array)))
+	k = max(10, int(2*math.log(r)))
+	k = min(k, r - 1)
 
-	W = np.zeros(shape=(r,r))
-
-	for i in range(r):
-		for j in range(i+1,r):
-			W[i,j] = np.exp(-(dists[i,j]**2))
-			W[j,i] = W[i,j]
-
-	D = np.diag(np.sum(W,axis=0))
-
-	D_inv = np.linalg.inv(D)
-
-	L_rw = np.identity(r) - np.matmul(D_inv,W)
-
-	eig_val, eig_vec = np.linalg.eig(L_rw)
-
-	eig_vec = eig_vec[:,np.argsort(eig_val)]
-	eig_val = eig_val[np.argsort(eig_val)]
-	
-	if sum(np.iscomplex(eig_val)) > 0:
-		print("Spectral Clustering failed. Clusters are assigned by affinity_propagation.")
-		print(np_array.shape)
-		labels = affinity_propagation(np_array,weights)
-		if labels[0] == -1 or max(labels) == 0:
-			labels = np.arange(np_array.shape[0])
-			print("Affinity propagation failed")
-	else:	
-		index_eigen_gap = np.argmax(np.diff(eig_val))
-		n_clusters = index_eigen_gap + 2
-		V = eig_vec[:,:n_clusters]
-		Z = linkage(V, 'ward')
-		labels = fcluster(Z, n_clusters, criterion='maxclust') - 1
-
-	return(labels)
-
-def KNN_Spectral(df):
-	r,c =df.shape
-	k = max(int(r/10),5)
-	connectivity = kneighbors_graph(X=df, n_neighbors=k, mode='distance')
+	connectivity = kneighbors_graph(X=np_array, n_neighbors=k, mode='connectivity',metric="hamming",include_self=False)
 
 	A = (1/2)*(connectivity + connectivity.T)
 	
@@ -386,26 +401,32 @@ def KNN_Spectral(df):
 
 	L = L.toarray()
 
-	eig_val, eig_vec = np.linalg.eig(L)
+	evals, evecs = np.linalg.eigh(L)
 
-	eig_vec = eig_vec[:,np.argsort(eig_val)]
-	eig_val = eig_val[np.argsort(eig_val)]
-	#print(eig_val)
-	
-	if sum(np.iscomplex(eig_val)) > 0:
-		print("Spectral Clustering failed. Clusters are assigned by affinity_propagation.")
-		labels = affinity_propagation(df)
-		print(max(labels))
-		if labels[0] == -1 or max(labels) == 0:
-			labels = np.arange(df.shape[0])
-			print("Affinity propagation failed")
-	else:	
-		index_eigen_gap = np.argmax(np.diff(eig_val))
-		n_clusters = index_eigen_gap + 2
-		V = eig_vec[:,:n_clusters]
-		Z = linkage(V, 'ward')
-		labels = fcluster(Z, n_clusters, criterion='maxclust') - 1
-		
+	# Use eigengap on the smallest part of the spectrum
+	m = min(k_max_eigs, r - 1)
+	small = evals[:m]
+	gaps = np.diff(small)
+
+	# Ignore the trivial first eigenvalue near 0; search gaps starting from index 1
+	if len(gaps) < 2:
+		n_clusters = 1
+	else:
+		j = 1 + np.argmax(gaps[1:])  # j is the split point
+		n_clusters = j + 1
+
+	# Spectral embedding: take first n_clusters eigenvectors
+	V = evecs[:, :n_clusters]
+
+	# Row-normalize (common in Ng-Jordan-Weiss style)
+	V_norm = V / (np.linalg.norm(V, axis=1, keepdims=True) + eps)
+
+	# Cluster embedding (Ward on Euclidean in embedding space is fine)
+	Z = linkage(V_norm, method="ward")
+	labels = fcluster(Z, t=n_clusters, criterion="maxclust") - 1
+
+	#print(max(labels))
+
 	return(labels)
 
 def BlockDM_generation(ch,r,hap_matrix_d1,hap_matrix_d2,geno_matrix,variant_names,variant_positions,fine_breakpoints,HaploBlock_matrix,haplotype_block_name,haplotype_marker_name,clutering_algorithm):
@@ -453,6 +474,7 @@ def haplotype_DM_generator(block_index,clutering_algorithm,haplotypes,n_clusters
 
 	dedup_haplotypes = np.asarray(haplotypes.drop_duplicates(keep = 'first'))
 	d_r,d_c = dedup_haplotypes.shape
+
 	if d_r < n_clusters:  # The situation no.1 no clutering_algorithm is necessary
 		
 		for i in range(d_r):
@@ -470,7 +492,7 @@ def haplotype_DM_generator(block_index,clutering_algorithm,haplotypes,n_clusters
 		if clutering_algorithm == 'xmeans':
 			clusters = xmeans_clustering(list(dedup_haplotypes))
 		elif clutering_algorithm == 'affinity_propagation':
-			clusters = affinity_propagation(dedup_haplotypes)
+			clusters = affinity_propagation_update(dedup_haplotypes)
 			if clusters[0] == -1 or max(clusters) == 0:
 				clusters = np.arange(d_r)
 				print("Affinity propagation failed",clusters)

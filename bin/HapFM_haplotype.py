@@ -51,7 +51,7 @@ with open(args.output+"_alone_SNPs.txt", "w") as L:
 
 		# calculating the allele frequency and find common alleles 
 		allele_frequency = np.sum(geno_matrix[ch],axis = 0) / (2*r)
-		common_allele_index[ch] = [i for i in range(len(allele_frequency)) if allele_frequency[i] > 0.02 and allele_frequency[i] < 0.98 ]
+		common_allele_index[ch] = [i for i in range(len(allele_frequency)) if allele_frequency[i] > args.maf and allele_frequency[i] < (1-args.maf) ]
 		common_geno_matrix[ch] = geno_matrix[ch][:,common_allele_index[ch]]
 		common_variant_names[ch] = [variant_names[ch][i] for i in common_allele_index[ch]]
 		common_variant_positions[ch] =[variant_positions[ch][i] for i in common_allele_index[ch]]
@@ -59,7 +59,7 @@ with open(args.output+"_alone_SNPs.txt", "w") as L:
 		#standardize the genotype matrix
 		common_geno_matrix_standard = preprocessing.scale(common_geno_matrix[ch])
 		#partition into complete independent LD blocks
-		print("start finding complete independent LD blocks using common SNPs with maf > 0.02")
+		print("start finding complete independent LD blocks using common SNPs with maf > %f" %(args.maf))
 		IndepLD_common_breakpoints_index[ch],alone_common_SNPs_index[ch] = bp.CompleteLDPartition(standardized_genotype_matrix=common_geno_matrix_standard,cutoff=args.corr,window_size=args.window)
 		if len(alone_common_SNPs_index[ch]) > 0:
 			for i in alone_common_SNPs_index[ch]:
@@ -75,7 +75,7 @@ for ch in chromosome:
 if args.block == "bigld":
 	with open(args.output+"_fine_genomewide_partition.txt", "w") as GW_BREAKPOITS:
 		for ch in chromosome:
-			common_fine_breakpoints = bp.BigLD_partition(DIR,IndepLD_common_breakpoints_index[ch],common_geno_matrix[ch],common_variant_names[ch],common_variant_positions[ch],args.CLQcut,args.output)
+			common_fine_breakpoints = bp.BigLD_partition(DIR,IndepLD_common_breakpoints_index[ch],common_geno_matrix[ch],common_variant_names[ch],common_variant_positions[ch],args.CLQcut,args.output,ch,args.maf)
 			gw_fine_breakpoints[ch] = uf.convert_fine_genomewide_breakpoints(common_fine_breakpoints,common_allele_index[ch],len(variant_names[ch]),gw_independent_breakpoints[ch])
 			for i in range(len(gw_fine_breakpoints[ch])):
 				GW_BREAKPOITS.write(str(ch+"\t"+'\t'.join(map(str, gw_fine_breakpoints[ch][i]))+"\n"))	

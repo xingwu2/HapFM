@@ -865,3 +865,145 @@ preprocessing steps:
 # 	gamma_trace = pd.DataFrame(gamma_trace)
 # 	theta_trace = pd.DataFrame(theta_trace)
 # 	return(trace,alpha_trace,beta_trace,gamma_trace,theta_trace)
+
+def local_scale_Spectral_old(np_array):
+	r,c =np_array.shape
+	k = max(int(r/10),10)
+
+	dists = squareform(pdist((np_array)))
+	knn_distances = np.sort(dists, axis=0)[k]
+	knn_distances = knn_distances[np.newaxis].T
+	local_scale = knn_distances.dot(knn_distances.T)
+	affinity_matrix = - dists * dists / local_scale
+	affinity_matrix[np.where(np.isnan(affinity_matrix))] = 0.0
+	affinity_matrix = np.exp(affinity_matrix)
+	np.fill_diagonal(affinity_matrix, 0)
+
+	L = csgraph.laplacian(affinity_matrix,normed = True)
+	eig_val, eig_vec = np.linalg.eig(L)
+	eig_val = np.real(eig_val)
+	eig_vec = np.real(eig_vec)
+	
+	eig_vec = eig_vec[:,np.argsort(eig_val)]
+	eig_val = eig_val[np.argsort(eig_val)]
+
+	if sum(np.iscomplex(eig_val)) > 0:
+		print("Spectral Clustering failed. Clusters are assigned by affinity_propagation.")
+		print(np_array.shape)
+		labels = affinity_propagation(np_array)
+		print(max(labels))
+		if labels[0] == -1 or max(labels) == 0:
+			labels = np.arange(np_array.shape[0])
+			print("Affinity propagation failed")
+		
+	else:
+		index_largest_gap = np.argsort(np.diff(eig_val))[::-1][0]
+		#print(index_largest_gap)
+		n_clusters = index_largest_gap + 2
+		V = eig_vec[:,:n_clusters]
+		Z = linkage(V, 'ward')
+		labels = fcluster(Z, n_clusters, criterion='maxclust') - 1
+	return(labels)
+
+def KNN_Spectral_old(np_array):
+	r,c =df.shape
+	k = max(int(r/10),5)
+	connectivity = kneighbors_graph(X=df, n_neighbors=k, mode='distance')
+
+	A = (1/2)*(connectivity + connectivity.T)
+	
+	L = csgraph.laplacian(A,normed = True)
+
+	L = L.toarray()
+
+	eig_val, eig_vec = np.linalg.eig(L)
+
+	eig_vec = eig_vec[:,np.argsort(eig_val)]
+	eig_val = eig_val[np.argsort(eig_val)]
+	#print(eig_val)
+	
+	if sum(np.iscomplex(eig_val)) > 0:
+		print("Spectral Clustering failed. Clusters are assigned by affinity_propagation.")
+		labels = affinity_propagation(df)
+		print(max(labels))
+		if labels[0] == -1 or max(labels) == 0:
+			labels = np.arange(df.shape[0])
+			print("Affinity propagation failed")
+	else:	
+		index_eigen_gap = np.argmax(np.diff(eig_val))
+		n_clusters = index_eigen_gap + 2
+		V = eig_vec[:,:n_clusters]
+		Z = linkage(V, 'ward')
+		labels = fcluster(Z, n_clusters, criterion='maxclust') - 1
+		
+	return(labels)
+
+def Spectral_clustering(np_array):
+	r,c =np_array.shape
+	dists = squareform(pdist((np_array)))
+
+	W = np.zeros(shape=(r,r))
+
+	for i in range(r):
+		for j in range(i+1,r):
+			W[i,j] = np.exp(-(dists[i,j]**2))
+			W[j,i] = W[i,j]
+
+	D = np.diag(np.sum(W,axis=0))
+
+	D_inv = np.linalg.inv(D)
+
+	L_rw = np.identity(r) - np.matmul(D_inv,W)
+
+	eig_val, eig_vec = np.linalg.eig(L_rw)
+
+	eig_vec = eig_vec[:,np.argsort(eig_val)]
+	eig_val = eig_val[np.argsort(eig_val)]
+	
+	if sum(np.iscomplex(eig_val)) > 0:
+		print("Spectral Clustering failed. Clusters are assigned by affinity_propagation.")
+		print(np_array.shape)
+		labels = affinity_propagation(np_array,weights)
+		if labels[0] == -1 or max(labels) == 0:
+			labels = np.arange(np_array.shape[0])
+			print("Affinity propagation failed")
+	else:	
+		index_eigen_gap = np.argmax(np.diff(eig_val))
+		n_clusters = index_eigen_gap + 2
+		V = eig_vec[:,:n_clusters]
+		Z = linkage(V, 'ward')
+		labels = fcluster(Z, n_clusters, criterion='maxclust') - 1
+
+	return(labels)
+
+
+def local_scale_modularity_old(df):
+	r,c = df.shape
+	W = np.zeros(shape=(r,r))
+	k = max(int(r/10),5)
+	dists = squareform(pdist(df))
+
+	knn_distances = np.sort(dists, axis=0)[k]
+	knn_distances = knn_distances[np.newaxis].T
+	local_scale = knn_distances.dot(knn_distances.T)
+	W = - dists * dists / local_scale
+
+	W[np.where(np.isnan(W))] = 0.0
+	W = np.exp(W)
+	np.fill_diagonal(W, 0)
+
+	connectivity = kneighbors_graph(X=df, n_neighbors=k, mode='connectivity')
+	connectivity = 0.5 * (connectivity + connectivity.T) ## make connectivity symmetric
+
+	connectivity_matrix = connectivity.toarray()
+	weighted_connectivity = np.multiply(W,connectivity_matrix)
+	G = nx.from_numpy_array(weighted_connectivity)
+	## this is a more stable function that the results can be reproduced due to the seed setting
+	louvain_partition = nx.community.louvain_communities(G,seed=k)
+	labels = np.zeros(r,dtype=int)
+	for i in range(r):
+		for k in range(len(louvain_partition)):
+			clusters_ = [*louvain_partition[k],]
+			for m in clusters_:
+				labels[m] = k
+	return(labels)
