@@ -36,7 +36,7 @@ def main():
 	y_noNA = [y[i] for i in NA_index]
 
 	y = np.asarray(y_noNA,dtype=np.float64)
-	print(y)
+	#print(y)
 
 	if args.covariates is None:
 		C = np.ones(n)
