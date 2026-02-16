@@ -118,8 +118,8 @@ def main():
 		trace_posterior = np.mean(trace_posterior_all_chains,axis=0)
 		trace_posterior_sd = np.std(trace_posterior_all_chains,axis=0)
 
-		pip = np.mean(gamma_all_chains,axis=0)
-		block_pip = np.mean(block_gamma_all_chains,axis=0)
+		pip = np.median(gamma_all_chains,axis=0)
+		block_pip = np.median(block_gamma_all_chains,axis=0)
 
 		## sort blocks by fdrs
 		index,fdr = uf.fdr_calculation(block_pip)
