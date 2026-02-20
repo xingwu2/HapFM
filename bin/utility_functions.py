@@ -164,21 +164,36 @@ def convert_fine_genomewide_breakpoints(common_breakpoints,common_index,r,gw_ind
 			right = common_index[common_right]
 		gw_breakpoints.append([left,right])
 
+	# j = 0
+	# while j < len(gw_breakpoints):
+	# 	if gw_breakpoints[j][1] - gw_breakpoints[j][0] < 2:
+
+	# 		if gw_breakpoints[j][0] in IndepLD_breakpoints or gw_breakpoints[j][1] in IndepLD_breakpoints:
+	# 			if j == 0:
+	# 				gw_breakpoints[j+1] = [gw_breakpoints[j][0],gw_breakpoints[j+1][1]]
+	# 				del gw_breakpoints[j]
+	# 			else:
+	# 				j += 1
+	# 		else:
+	# 			gw_breakpoints[j-1] = [gw_breakpoints[j-1][0],gw_breakpoints[j][1]]
+	# 			del gw_breakpoints[j]
+	# 	else:
+	# 		j += 1
+
 	j = 0
 	while j < len(gw_breakpoints):
 		if gw_breakpoints[j][1] - gw_breakpoints[j][0] < 2:
 
-			if gw_breakpoints[j][0] in IndepLD_breakpoints or gw_breakpoints[j][1] in IndepLD_breakpoints:
-				if j == 0:
-					gw_breakpoints[j+1] = [gw_breakpoints[j][0],gw_breakpoints[j+1][1]]
-					del gw_breakpoints[j]
-				else:
-					j += 1
+			if gw_breakpoints[j][0] in IndepLD_breakpoints:
+				gw_breakpoints[j+1] = [gw_breakpoints[j][0],gw_breakpoints[j+1][1]]
+				del gw_breakpoints[j]
+
 			else:
 				gw_breakpoints[j-1] = [gw_breakpoints[j-1][0],gw_breakpoints[j][1]]
 				del gw_breakpoints[j]
 		else:
 			j += 1
+
 	return(gw_breakpoints)
 
 def Standardize(X):
@@ -245,7 +260,7 @@ def xmeans_clustering(array):
 	for i in range(len(clusters_)):
 		for j in clusters_[i]:
 			clusters[j] = i
-	print(clusters)
+	#print(clusters)
 	return(clusters)
 
 def gmeans_clustering(array):
@@ -650,50 +665,103 @@ def block_beta(beta_mean,block_haplotypes,block_positions):
 
 def merge_welford(A_mean, A_M2,A_n,B_mean,B_M2,B_n):
 
-    if A_n == 0:
-        return(B_mean,B_M2,B_n)
+	if A_n == 0:
+		return(B_mean,B_M2,B_n)
 
-    if B_n == 0:
-        return(A_mean,A_M2,A_n)
+	if B_n == 0:
+		return(A_mean,A_M2,A_n)
     
-    n_new = A_n + B_n
-    delta = B_mean - A_mean
+	n_new = A_n + B_n
+	delta = B_mean - A_mean
 
-    mean = A_mean + delta * (B_n / n_new)
-    M2 = A_M2 + B_M2 + (delta * delta) * (A_n * B_n / n_new)
+	mean = A_mean + delta * (B_n / n_new)
+	M2 = A_M2 + B_M2 + (delta * delta) * (A_n * B_n / n_new)
 
-    return(mean,M2,n_new)
+	return(mean,M2,n_new)
 
 def welford(mean,M2,x,n):
-    n = n + 1
+	n = n + 1
 
-    delta = x - mean
-    mean += delta / n
-    delta2 = x - mean
-    M2 += delta * delta2
+	delta = x - mean
+	mean += delta / n
+	delta2 = x - mean
+	M2 += delta * delta2
 
-    return(mean,M2)
+	return(mean,M2)
 
 def convergence_geweke_test(trace,top5_beta_trace,start,end):
-    max_z = []
+	max_z = []
 
     ## convergence for the trace values
-    n = trace.shape[1]
-    for t in range(n):
-        trace_convergence = trace[start:end,t]
-        trace_t_convergence_zscores = geweke.geweke(trace_convergence)[:,1]
-        max_z.append(np.amax(np.absolute(trace_t_convergence_zscores)))
+	n = trace.shape[1]
+	for t in range(n):
+		trace_convergence = trace[start:end,t]
+		trace_t_convergence_zscores = geweke.geweke(trace_convergence)[:,1]
+		max_z.append(np.amax(np.absolute(trace_t_convergence_zscores)))
 
-    m = top5_beta_trace.shape[1]
-    for b in range(m):
-        top_beta_convergence = top5_beta_trace[start:end,b]
-        beta_b_convergence_zscores = geweke.geweke(top_beta_convergence)[:,1]
-        max_z.append(np.amax(np.absolute(beta_b_convergence_zscores)))
+	m = top5_beta_trace.shape[1]
+	for b in range(m):
+		top_beta_convergence = top5_beta_trace[start:end,b]
+		beta_b_convergence_zscores = geweke.geweke(top_beta_convergence)[:,1]
+		max_z.append(np.amax(np.absolute(beta_b_convergence_zscores)))
 
-    if np.amax(max_z) < 1.5:
-        return(1)
+	if np.amax(max_z) < 1.5:
+		return(1)
 
 
+
+def keep_largest_overlaps(blocks):
+	"""
+	blocks: list of [start, end]
+	Return only the largest block in each overlapping cluster.
+	"""
+
+	# convert to tuples
+	ivals = [(int(s), int(e)) for s, e in blocks]
+	n = len(ivals)
+	if n <= 1:
+		return blocks
+
+	# build overlap graph
+	adj = [[] for _ in range(n)]
+	for i in range(n):
+		for j in range(i + 1, n):
+			a0, a1 = ivals[i]
+			b0, b1 = ivals[j]
+			if not (a1 < b0 or b1 < a0):  # overlap
+				adj[i].append(j)
+				adj[j].append(i)
+
+	visited = [False] * n
+	result = []
+
+	for i in range(n):
+		if visited[i]:
+			continue
+
+		# DFS to collect overlapping cluster
+		stack = [i]
+		visited[i] = True
+		cluster = [i]
+
+		while stack:
+			u = stack.pop()
+			for v in adj[u]:
+				if not visited[v]:
+					visited[v] = True
+					stack.append(v)
+					cluster.append(v)
+
+		# choose largest block in this cluster
+		best = max(
+			cluster,
+			key=lambda k: (ivals[k][1] - ivals[k][0], -ivals[k][0], ivals[k][1])
+		)
+
+		result.append(list(ivals[best]))
+
+	sorted_results = sorted(result, key=lambda x: x[0])
+	return(sorted_results)
 
 
 

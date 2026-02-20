@@ -109,7 +109,7 @@ def BigLD_partition(DIR,IndepLD_breakpoints_index,geno_matrix,variant_names,vari
 		INFO = open(prefix+"_"+str(I)+"_snpINFO"+".btmp","w")
 		INFO.write("chrN\trsID\tbp\n")
 		for j in range(len(tmp_positions)):
-			INFO.write(str(ch)+"\t"+str(tmp_names[j])+"\t"+str(tmp_positions[j])+"\n")
+			INFO.write("tmp"+"\t"+str(tmp_names[j])+"\t"+str(tmp_positions[j])+"\n")
 		INFO.close()
 
 		BigLD_command = "Rscript "+DIR+"/BigLD.R -g "+prefix+"_"+str(I)+"_geno_matrix"+".btmp"+ " -s "+prefix+"_"+str(I)+"_snpINFO"+".btmp" + " -c " + str(CLQcut) + " -m " + str(maf) + " -o " + prefix+"_"+str(I)
@@ -124,13 +124,18 @@ def BigLD_partition(DIR,IndepLD_breakpoints_index,geno_matrix,variant_names,vari
 					blocks.append([variant_positions.index(int(items[5])),variant_positions.index(int(items[6]))])
 			blocks[-1][1] = right
 
+			blocks = uf.keep_largest_overlaps(blocks)
+
 			fine_breakpoints_ch.extend(blocks)
+
 
 		except subprocess.CalledProcessError as e:
 			print("BigLD cannot further partition blocks in this region %i - %i" %(left,right))
 			fine_breakpoints_ch.append(IndepLD_breakpoints_index[I])
+
 		rm_command = "rm "+prefix+"_"+str(I)+"_*btmp*"
 		subprocess.check_call(rm_command,shell = True)
+		
 
 	return(fine_breakpoints_ch)
 
